@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Раскладчик</title>
+<script>try{ const t=localStorage.getItem('app.theme'); if(t==='light'||t==='dark') document.documentElement.dataset.theme=t; }catch(e){}</script>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Crect width=%2764%27 height=%2764%27 rx=%2714%27 fill=%27%23d9480f%27/%3E%3Crect x=%2714%27 y=%2722%27 width=%2736%27 height=%2720%27 rx=%274%27 fill=%27none%27 stroke=%27white%27 stroke-width=%275%27/%3E%3Cpath d=%27M32 12v40%27 stroke=%27white%27 stroke-width=%274%27 stroke-dasharray=%275 4%27/%3E%3C/svg%3E">
 <style>
 :root{
@@ -63,6 +64,7 @@ tr.need td{background:color-mix(in srgb, var(--warnbg) 55%, transparent)}
 .badge.tif{background:#efe8fb;color:#6b3fbf}
 .badge.man{background:#e8f4ec;color:#2b7a4b}
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .badge.xt{background:#1d2a44;color:#9bbcff} :root:not([data-theme="light"]) .badge.pdf{background:#3a1f1f;color:#ff9b93} :root:not([data-theme="light"]) .badge.tif{background:#2e2540;color:#c9b2ff} :root:not([data-theme="light"]) .badge.man{background:#1d3326;color:#7fd6a0} }
+:root[data-theme="dark"] .badge.xt{background:#1d2a44;color:#9bbcff} :root[data-theme="dark"] .badge.pdf{background:#3a1f1f;color:#ff9b93} :root[data-theme="dark"] .badge.tif{background:#2e2540;color:#c9b2ff} :root[data-theme="dark"] .badge.man{background:#1d3326;color:#7fd6a0}
 .st{display:inline-block;font-size:12px;font-weight:600;border-radius:5px;padding:1px 7px;margin-left:6px}
 .st.fill{background:var(--errbg);color:var(--err)}
 .st.check{background:var(--warnbg);color:var(--warn)}
@@ -156,6 +158,9 @@ tfoot td{border-bottom:0;background:var(--soft);font-weight:700}
 input::placeholder{color:var(--muted);opacity:.8}
 .endsk{margin:6px 0 4px}
 .endsvg{width:100%;height:auto;display:block;max-height:150px}
+.endsvg{max-height:210px;cursor:ew-resize}.endsvg .e3l{stroke:var(--accent);stroke-width:1.4;opacity:.75}
+.endsvg .e3c{fill:color-mix(in srgb, var(--accent) 20%, transparent);stroke:var(--accent);stroke-width:2}.endsvg .e3c.on{fill:color-mix(in srgb, var(--accent) 38%, transparent)}
+.endsvg .ept2.oth circle+circle{opacity:.55}
 .endsvg .ept2{cursor:pointer}.endsvg .ept2 circle+circle{fill:var(--card,#fff);stroke:var(--muted);stroke-width:2}
 .endsvg .ept2.sel circle+circle{stroke:var(--accent)}.endsvg .ept2.long circle+circle{fill:var(--accent);stroke:var(--accent)}
 .endsvg .ept2:hover circle+circle{stroke:var(--accent);stroke-width:3}
@@ -181,6 +186,15 @@ input::placeholder{color:var(--muted);opacity:.8}
 .projbox{display:flex;align-items:center;gap:10px;justify-content:center;flex-wrap:wrap;margin:18px auto 0;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px 10px 16px;font-size:14px;color:var(--muted);max-width:980px}
 .projbox input{padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit;min-width:0}
 .projbox .pn{width:240px}.projbox .pc{width:170px}
+.start{position:relative}
+.st-corner{position:absolute;top:16px;right:18px;display:flex;gap:10px;align-items:center}
+.ibtn{width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:var(--panel);color:var(--ink);font:700 16px/1 Georgia,serif;font-style:italic;cursor:pointer}
+.ibtn:hover{border-color:var(--accent);color:var(--accent)}
+#themeSeg button.on{background:var(--ink);color:var(--panel)}
+.nver{border-bottom:1px solid var(--line);padding:12px 2px}.nver:last-child{border-bottom:0}
+.nver .nh{display:flex;align-items:center;gap:10px;margin-bottom:6px}.nver .nh b{font-size:16px}
+.nver .nh .cur{color:var(--accent);font-size:13px;font-weight:600}
+.nver .nt{white-space:pre-wrap;font-size:14px;line-height:1.5;color:var(--ink)}
 .st-foot{margin-top:28px;display:flex;gap:12px;justify-content:center;align-items:center;flex-wrap:wrap;color:var(--muted);font-size:13px}
 .st-foot .new{color:var(--accent);font-weight:600}
 .st-cards{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
@@ -203,6 +217,7 @@ input::placeholder{color:var(--muted);opacity:.8}
 .sv{display:inline-block;font-size:12px;font-weight:600;border-radius:5px;padding:1px 7px;margin-left:8px;vertical-align:1px}
 .sv.ok{background:#e3f4e9;color:var(--ok)} .sv.fix{background:var(--soft);color:var(--accent)} .sv.warn{background:var(--warnbg);color:var(--warn)} .sv.err{background:var(--errbg);color:var(--err)}
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .sv.ok{background:#1d3326} }
+:root[data-theme="dark"] .sv.ok{background:#1d3326}
 .wtxt{color:var(--warn);font-size:13.5px}
 tr.bad td{background:color-mix(in srgb, var(--errbg) 50%, transparent)}
 .banner.okb{background:var(--soft);color:var(--ink)}
@@ -298,6 +313,7 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
 .sadd input.nm{width:80px} .sadd input.nm.sm{width:50px}
 .pat.stk .n em{display:block;font-style:normal;font-size:11px;font-weight:600;color:var(--ok);font-family:inherit}
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .schip{background:#1d3326} }
+:root[data-theme="dark"] .schip{background:#1d3326}
 
 .v3box{flex:1;position:relative;min-height:0;background:var(--bg)}
 .v3box canvas{position:absolute;inset:0;width:100%;height:100%;cursor:grab}
@@ -380,6 +396,7 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
 <body>
 <!-- ===== START ===== -->
 <div class="start" id="start">
+  <div class="st-corner"><div class="seg sm" id="themeSeg" title="Оформление"><button data-th="auto">Авто</button><button data-th="light">☀ Светлая</button><button data-th="dark">☾ Тёмная</button></div><button class="ibtn" id="notesBtn" title="Что нового — все версии">i</button></div>
   <div class="start-in">
     <h1 class="st-title">Расклад<span>чик</span></h1>
     <p class="st-sub">Что считаем?</p>
@@ -599,6 +616,11 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
   <div class="dlg-b" id="histList"></div>
   <div class="dlg-f"><span class="meta" id="histDir"></span><span class="spacer"></span><button class="btn" id="histFolder">Открыть папку истории</button></div>
 </div></div>
+<div class="modal center" id="notesm" hidden><div class="dlg wide">
+  <div class="dlg-h"><h2>Что нового — все версии</h2><span class="meta">сейчас установлена v__APP_VER__</span><button class="ic" id="notesClose">✕</button></div>
+  <div class="dlg-b" id="notesList"></div>
+  <div class="dlg-f"><span class="meta" id="notesMsg"></span><span class="spacer"></span><a class="btn" href="https://github.com/__APP_REPO__/releases" target="_blank" rel="noopener">Все версии на GitHub</a></div>
+</div></div>
 <div class="modal center" id="sdlg" hidden><div class="dlg">
   <div class="dlg-h"><h2 id="sdTitle">Сохранить</h2><button class="ic" id="sdClose">✕</button></div>
   <div class="dlg-b">
@@ -623,7 +645,7 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
 <div class="toast" id="sToast" hidden></div>
 <div class="askov" id="sAsk" hidden></div>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs id="nDefs"></defs></svg>
-<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><pattern id="restHatch" patternUnits="userSpaceOnUse" width="60" height="60" patternTransform="rotate(45)"><rect width="60" height="60" fill="#e9e5dc" fill-opacity=".55"/><line x1="0" y1="0" x2="0" y2="60" stroke="#b9b2a4" stroke-width="10" stroke-opacity=".5"/></pattern></defs></svg>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><pattern id="restHatch" patternUnits="userSpaceOnUse" width="60" height="60" patternTransform="rotate(45)"><rect width="60" height="60" style="fill:var(--line2)" fill-opacity=".7"/><line x1="0" y1="0" x2="0" y2="60" style="stroke:var(--line)" stroke-width="10"/></pattern></defs></svg>
 
 <!-- ===== ХЛЫСТ ===== -->
 <div class="modal" id="barm" hidden>
@@ -1040,7 +1062,7 @@ function buildForm(){
   </div>
   <div class="fs"><div class="t">Длина и торцы</div>
     <div class="row"><div class="fld"><span>Длина L, мм (наибольшая)</span><input type="text" inputmode="decimal" class="nm" data-k="L" value="${esc(d.L)}" style="width:120px"></div></div>
-    <div class="endsk"><div id="endSk"></div><div class="hint2">Нажмите на точку у торца: выберется этот торец, а точка станет <b>длинным углом</b> (острым концом скоса). Угол — ниже.</div></div>
+    <div class="endsk"><div id="endSk"></div></div>
     <div id="endPanel"></div>
   </div>
   <div class="fs"><div class="t">Отверстия</div>
@@ -1068,44 +1090,91 @@ function endPanel(){
   const sideOpts = pr.type==='round' ? null : pr.type==='channel' ? [['a','H на виде'],['b','B на виде']] : [['a','A на виде'],['b','B на виде']];
   $('#endPanel').innerHTML = `<div class="endpan">
     <div class="ept">Торец ${i+1} <span class="meta">${i===0?'(слева на схеме)':'(справа на схеме)'}</span><span class="spacer"></span><div class="seg sm"><button data-esel="0" class="${i===0?'on':''}">Торец 1</button><button data-esel="1" class="${i===1?'on':''}">Торец 2</button></div></div>
-    <div class="row"><div class="fld"><span>Угол, °</span><input type="text" data-k="ends.${i}.ang" value="${esc(e.ang)}" placeholder="90" style="width:90px"></div>
+    <div class="row"><div class="fld"><span>Угол (градусы:минуты)</span><input type="text" data-k="ends.${i}.ang" value="${esc(e.ang)}" placeholder="38:20" style="width:110px"></div>
       <div class="fld"><span>&nbsp;</span><div class="qang">${['90','75','60','45','30'].map(a=>`<button class="btn small${String(e.ang).trim()===a?' on':''}" data-qang="${a}">${a}°</button>`).join('')}</div></div></div>
+    <div class="hint2" style="margin:-2px 0 8px">Угол с минутами — через двоеточие: <b>38:20</b> = 38°20′. Можно и 38-20, 38 20, 38,5.</div>
     <div class="row"><div class="fld"><span>Угол отложен</span><select data-k="ends.${i}.ref"><option value="axis"${e.ref!=='face'?' selected':''}>к оси (к длинной кромке)</option><option value="face"${e.ref==='face'?' selected':''}>к торцу (от перпендикуляра)</option></select></div>
-      <div class="fld"><span>Длинный угол</span><div class="seg sm"><button data-long="top" class="${ed.long[i]==='top'?'on':''}">сверху</button><button data-long="bot" class="${ed.long[i]!=='top'?'on':''}">снизу</button></div></div>
+      <div class="fld"><span>Длинный угол</span><div class="seg sm"><button data-long="bot" class="${ed.long[i]!=='top'?'on':''}">у начала стороны</button><button data-long="top" class="${ed.long[i]==='top'?'on':''}">у конца стороны</button></div></div>
       ${sideOpts?`<div class="fld"><span>Скос виден на стороне</span><select data-k="ends.${i}.side">${sideOpts.map(([v,t])=>`<option value="${v}"${e.side===v?' selected':''}>${t}</option>`).join('')}</select></div>`:''}</div>
   </div>`;
 }
+// схема детали в 3D: сечение увеличено, точки на торцах — выбор торца, плоскости скоса и длинного угла
+// ed.long[i]: 'bot' — длинный угол у начала стороны (индекс 0), 'top' — у конца (индекс 1), в координатах схемы
+function shapeFromLong(d){
+  const s0 = (d.ends[0]&&d.ends[0].side)==='b' ? 'b' : 'a', s1 = (d.ends[1]&&d.ends[1].side)==='b' ? 'b' : 'a';
+  const flipPlane = ed.long[0]==='top' ? s0 : null;   // у торца 1 длинный угол в модели всегда «индекс 0» — схему зеркалим
+  const L1 = ed.long[1]==='top' ? 1 : 0, m2 = (s1===flipPlane) ? 1-L1 : L1;
+  d.shape = m2===0 ? 'trap' : 'para';
+  return flipPlane;
+}
+function sectionOutline(pr, A, B, t){
+  const a=A/2, b=B/2;
+  if(pr.type==='round'){ const o=[]; for(let k=0;k<32;k++){ const f=k/32*2*Math.PI; o.push([a*Math.cos(f), a*Math.sin(f)]); } return o; }
+  if(pr.type==='angle') return [[-a,-b],[a,-b],[a,-b+t],[-a+t,-b+t],[-a+t,b],[-a,b]].map(([u,v])=>[u,v]);
+  if(pr.type==='channel') return [[-a,-b],[a,-b],[a,b],[a-t,b],[a-t,-b+t],[-a+t,-b+t],[-a+t,b],[-a,b]];
+  return [[-a,-b],[a,-b],[a,b],[-a,b]];
+}
 function drawEnds(){
   const box=$('#endSk'); if(!box||!ed) return;
-  const d=ed.draft;
-  d.shape = ed.long[0]===ed.long[1] ? 'trap' : 'para';
+  { const cur=String((ed.draft.ends[ed.sel]||{}).ang||'').trim(); document.querySelectorAll('#endPanel [data-qang]').forEach(b=>b.classList.toggle('on', b.dataset.qang===cur)); }
+  const d=ed.draft, pr=d.prof||{type:'rect'};
+  const flipPlane = shapeFromLong(d);
   let g=null; try{ if(!C.validate(d).filter(m=>!/угол/i.test(m)).length) g=C.manualShape(d); }catch(e){}
   const skewOf = i => { try{ return C.endAngleToAxis(d.ends[i])<89.99; }catch(e){ return false; } };
-  const ref = d.ends[ed.sel], plane = d.prof && d.prof.type!=='round' && ref && ref.side==='b' ? 'b' : 'a';
-  const W=600, Hh=120, x0=60, x1=W-60, yT=26, yB=Hh-26;
-  let pts; // [низ-лево, низ-право, верх-право, верх-лево] в долях длины
-  if(g && g.L>0){ const k0=0, k1=plane==='b'?1:2; pts=[[g.lo[k0],1],[g.ro[k0],1],[g.ro[k1],0],[g.lo[k1],0]].map(([x,y])=>[x/g.L,y]); }
-  else pts=[[0,1],[1,1],[1,0],[0,0]];
-  // схема рисуется так, чтобы длинный угол торца 1 был там, где его выбрали
-  const flip = ed.long[0]==='top';
-  const P = pts.map(([fx,fy])=>[x0+fx*(x1-x0), (flip?1-fy:fy)? yB : yT]);
-  const corners = [[0,P[0],flip?'top':'bot'],[1,P[1],flip?'top':'bot'],[1,P[2],flip?'bot':'top'],[0,P[3],flip?'bot':'top']];
-  const angTxt = i => { const e=d.ends[i]; const a=String(e.ang||'90').trim(); return (a||'90')+'°'+(e.ref==='face'?' к торцу':''); };
-  const isLong = (i,pos) => skewOf(i) && ed.long[i]===pos;
-  box.innerHTML = `<svg viewBox="0 0 ${W} ${Hh}" class="endsvg">
-    <polygon points="${P.map(p=>p.join(',')).join(' ')}" fill="color-mix(in srgb, var(--accent) 16%, transparent)" stroke="var(--accent)" stroke-width="2"/>
-    <line x1="${x0-20}" y1="${(yT+yB)/2}" x2="${x1+20}" y2="${(yT+yB)/2}" stroke="var(--muted)" stroke-dasharray="6 5" stroke-width="1"/>
-    ${[0,1].map(i=>`<text x="${i?x1+8:x0-8}" y="${(yT+yB)/2-6}" text-anchor="${i?'start':'end'}" class="et${ed.sel===i?' on':''}">${i+1}</text><text x="${i?x1+8:x0-8}" y="${(yT+yB)/2+14}" text-anchor="${i?'start':'end'}" class="ea">${esc(angTxt(i))}</text>`).join('')}
-    ${corners.map(([i,[x,y],pos])=>`<g class="ept2${ed.sel===i?' sel':''}${isLong(i,pos)?' long':''}" data-pt-end="${i}" data-pt-pos="${pos}"><circle cx="${x}" cy="${y}" r="16" fill="transparent"/><circle cx="${x}" cy="${y}" r="${isLong(i,pos)?8:6}"/></g>`).join('')}
-    ${g&&g.bad?`<text x="${W/2}" y="${Hh-4}" text-anchor="middle" class="ebad">скосы не помещаются в длину — проверьте углы</text>`:''}
-  </svg><div class="meta" style="font-size:12px;text-align:center">Схема — вид сбоку${d.prof&&d.prof.type!=='round'?' (сторона '+(plane==='b'?(d.prof.type==='channel'?'B':'B'):(d.prof.type==='channel'?'H':'A'))+')':''}, высота увеличена для наглядности</div>`;
+  const L = g&&g.L>0 ? g.L : 1000, A = g ? g.A : 40, B = g ? (pr.type==='round'?g.A:g.B) : 25;
+  const tt = Math.min(num(pr.t)||Math.min(A,B)*0.1, Math.min(A,B)/3);
+  const k = Math.max(1, 0.2*L/Math.max(A,B,1));                 // сечение крупнее для наглядности
+  const lo = g ? g.lo : [0,0,0,0], ro = g ? g.ro : [L,L,L,L];
+  // смещение торца в точке сечения (u — сторона A, v — сторона B), билинейно по углам модели
+  const offAt = (arr,u,v) => { let ti=(u+A/2)/A, tj=(v+B/2)/B; if(flipPlane==='a') ti=1-ti; if(flipPlane==='b') tj=1-tj; ti=Math.max(0,Math.min(1,ti)); tj=Math.max(0,Math.min(1,tj));
+    return arr[0]*(1-ti)*(1-tj) + arr[1]*(1-ti)*tj + arr[2]*ti*(1-tj) + arr[3]*ti*tj; };
+  const out = sectionOutline(pr, A, B, tt);
+  const rot = ed.rot3 || 0, cr=Math.cos(rot), sr=Math.sin(rot);
+  const P = (x,u,v) => { const u2=(u*cr - v*sr)*k, v2=(u*sr + v*cr)*k; return [x + v2*0.55, -u2 - v2*0.32, v2]; };
+  const ends = [0,1].map(e => out.map(([u,v]) => P(e ? offAt(ro,u,v) : offAt(lo,u,v), u, v)));
+  // рамка
+  let x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity; for(const E of ends) for(const [x,y] of E){ x0=Math.min(x0,x); x1=Math.max(x1,x); y0=Math.min(y0,y); y1=Math.max(y1,y); }
+  const W=600, H=190, pad=34, sc=Math.min((W-2*pad)/(x1-x0||1), (H-2*pad)/(y1-y0||1));
+  const S = ([x,y]) => [pad + (x-x0)*sc + ((W-2*pad)-(x1-x0)*sc)/2, pad + (y-y0)*sc + ((H-2*pad)-(y1-y0)*sc)/2];
+  const poly = pts => pts.map(p=>S(p).map(v=>v.toFixed(1)).join(',')).join(' ');
+  // продольные рёбра: у профилей — в углах сечения, у круглой — по силуэту
+  let longi = [];
+  if(pr.type==='round'){ const ys = ends[0].map(p=>p[1]); longi = [ys.indexOf(Math.min(...ys)), ys.indexOf(Math.max(...ys))]; }
+  else longi = out.map((_,i)=>i);
+  // точки: для каждого торца и плоскости (a — по стороне A, b — по стороне B) два края: индекс 0 и 1
+  const dots = [];
+  for(const e of [0,1]) for(const pl of (pr.type==='round' ? ['a'] : ['a','b'])) for(const n of [0,1]){
+    let u = pl==='a' ? (n ? A/2 : -A/2) : 0, v = pl==='b' ? (n ? B/2 : -B/2) : 0;
+    if(pr.type==='angle' && pl==='a' && v===0) v = -B/2 + tt/2;         // уголок: точки на полках
+    if(pr.type==='angle' && pl==='b' && u===0) u = -A/2 + tt/2;
+    if(pr.type==='channel' && pl==='b') u = -A/2 + tt/2;
+    const x = e ? offAt(ro,u,v) : offAt(lo,u,v);
+    const side = (d.ends[e].side==='b' && pr.type!=='round') ? 'b' : 'a';
+    const isLong = skewOf(e) && side===pl && (ed.long[e]==='top' ? 1 : 0)===n;
+    dots.push({e, pl, n, p: S(P(x,u,v)), isLong, inPlane: side===pl});
+  }
+  const angTxt = i => { const e=d.ends[i]; const a=String(e.ang||'90').trim(); return (a||'90')+(/[°'′]/.test(a)?'':'°')+(e.ref==='face'?' к торцу':''); };
+  const c0 = S(P(offAt(lo,0,0),0,0)), c1 = S(P(offAt(ro,0,0),0,0));
+  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" class="endsvg" id="endSvg">
+    ${longi.map(i=>{ const a=S(ends[0][i]), b=S(ends[1][i]); return `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" class="e3l"/>`; }).join('')}
+    ${ends.map((E,e)=>`<polygon points="${poly(E)}" class="e3c${ed.sel===e?' on':''}"/>`).join('')}
+    <text x="${c0[0]-22}" y="${c0[1]+5}" text-anchor="end" class="et${ed.sel===0?' on':''}">1</text><text x="${c0[0]-22}" y="${c0[1]+22}" text-anchor="end" class="ea">${esc(angTxt(0))}</text>
+    <text x="${c1[0]+22}" y="${c1[1]+5}" class="et${ed.sel===1?' on':''}">2</text><text x="${c1[0]+22}" y="${c1[1]+22}" class="ea">${esc(angTxt(1))}</text>
+    ${dots.map(o=>`<g class="ept2${ed.sel===o.e?' sel':''}${o.isLong?' long':''}${o.inPlane?'':' oth'}" data-p3="${o.e}:${o.pl}:${o.n}"><circle cx="${o.p[0]}" cy="${o.p[1]}" r="14" fill="transparent"/><circle cx="${o.p[0]}" cy="${o.p[1]}" r="${o.isLong?7.5:5.5}"/></g>`).join('')}
+    ${g&&g.bad?`<text x="${W/2}" y="${H-4}" text-anchor="middle" class="ebad">скосы не помещаются в длину — проверьте углы</text>`:''}
+  </svg><div class="meta" style="font-size:12px;text-align:center">3D-схема (сечение увеличено). Тяните мышью — повернуть вокруг оси. Точки на торце: <b>длинный угол</b> скоса; точки на другой стороне профиля переносят скос на неё.</div>`;
+}
+{ let rd=null;
+  document.addEventListener('mousedown', e=>{ const sv=e.target.closest('#endSvg'); if(!sv||!ed) return; rd={x:e.clientX, r:ed.rot3||0, moved:false}; });
+  window.addEventListener('mousemove', e=>{ if(!rd||!ed) return; const dx=e.clientX-rd.x; if(Math.abs(dx)>3){ rd.moved=true; ed.rot3 = rd.r + dx*0.012; drawEnds(); } });
+  window.addEventListener('mouseup', ()=>{ if(rd&&rd.moved&&ed) ed.dragged=true; setTimeout(()=>{ if(ed) ed.dragged=false; },0); rd=null; });
 }
 function setPath(obj, path, val){ const ks=path.split('.'); let o=obj; for(let i=0;i<ks.length-1;i++) o=o[ks[i]]; o[ks[ks.length-1]]=val; }
 $('#edBody').addEventListener('input',e=>{ const k=e.target.dataset.k; if(!k||!ed) return; setPath(ed.draft,k,e.target.value); updateRes(); });
 $('#edBody').addEventListener('change',e=>{ const k=e.target.dataset.k; if(!k||!ed) return; setPath(ed.draft,k,e.target.value); updateRes(); });
 $('#edBody').addEventListener('click',e=>{
   if(!ed) return;
-  const ep=e.target.closest('[data-pt-end]'); if(ep){ const i=+ep.dataset.ptEnd; ed.sel=i; ed.long[i]=ep.dataset.ptPos; endPanel(); updateRes(); const a=$('#endPanel input[data-k$=".ang"]'); a&&a.focus(); a&&a.select(); return; }
+  const ep=e.target.closest('[data-p3]'); if(ep){ if(ed.dragged){ ed.dragged=false; return; } const [i,pl,n]=ep.dataset.p3.split(':'); const ei=+i; ed.sel=ei; if(ed.draft.prof.type!=='round') ed.draft.ends[ei].side=pl; ed.long[ei]= n==='1' ? 'top' : 'bot'; endPanel(); updateRes(); const a=$('#endPanel input[data-k$=".ang"]'); a&&a.focus(); a&&a.select(); return; }
   const es=e.target.closest('[data-esel]'); if(es){ ed.sel=+es.dataset.esel; endPanel(); updateRes(); return; }
   const lg=e.target.closest('[data-long]'); if(lg){ ed.long[ed.sel]=lg.dataset.long; endPanel(); updateRes(); return; }
   const qa=e.target.closest('[data-qang]'); if(qa){ ed.draft.ends[ed.sel].ang=qa.dataset.qang; endPanel(); updateRes(); return; }
@@ -1131,7 +1200,7 @@ function updateRes(showMiss){
   const g=C.manualShape(d); const plane = d.ends.some((e,i)=>skew[i]&&e.side==='b') && d.prof.type!=='round' ? 'b' : 'a';
   const sk = false ? `${sketchSvg(g,plane)}<div class="meta" style="font-size:12px">Эскиз для проверки формы (высота увеличена; деталь может быть показана перевёрнутой)${g.bad?' — <span class="miss">скосы не помещаются в длину, проверьте углы и форму</span>':''}</div>` : '';
   $('#edRes').innerHTML = `<div class="meta">${esc(r.profile)} · L ${fmt(num(d.L))} мм · торцы ${s.endLens.map(x=>fmt(x)).join(' + ')} мм</div>${sk}
-    <div class="big2">${fmt(s.total)} мм <span class="meta" style="font-family:inherit;font-size:14px;font-weight:400">на 1 шт · врезок ${s.pierces}${q>1?` · партия ${fmt(s.total*q/1000,3)} м`:''}</span></div>${badAng?'<div class="miss">Не понял угол торца — введите число, например 60 или 56°30\'</div>':''}`;
+    <div class="big2">${fmt(s.total)} мм <span class="meta" style="font-family:inherit;font-size:14px;font-weight:400">на 1 шт · врезок ${s.pierces}${q>1?` · партия ${fmt(s.total*q/1000,3)} м`:''}</span></div>${badAng?'<div class="miss">Не понял угол торца — введите, например, 60 или 38:20 (38°20′)</div>':''}`;
 }
 
 // viewer
@@ -1626,6 +1695,41 @@ window.__pdf = { lib: pdfLib, open: openPdf };
   } else prevInfo();
   projBox();
   window.__proj = { save: saveProj, info: () => J('proj.cur'), box: projBox };
+
+  // ----- тема: авто / светлая / тёмная -----
+  function setTheme(t){ if(t==='light'||t==='dark') document.documentElement.dataset.theme=t; else delete document.documentElement.dataset.theme;
+    try{ localStorage.setItem('app.theme', t); }catch(e){}
+    document.querySelectorAll('#themeSeg [data-th]').forEach(b=>b.classList.toggle('on', b.dataset.th===t)); }
+  setTheme((()=>{ try{ return localStorage.getItem('app.theme')||'auto'; }catch(e){ return 'auto'; } })());
+  $('#themeSeg').addEventListener('click', e=>{ const b=e.target.closest('[data-th]'); if(b) setTheme(b.dataset.th); });
+
+  // ----- «i»: что нового во всех версиях; скачать / установить любую -----
+  const NOTES = __APP_NOTES__, CUR = '__APP_VER__', REPO = '__APP_REPO__';
+  const vcmp = (a,b) => { const x=a.split('.').map(Number), y=b.split('.').map(Number); for(let i=0;i<Math.max(x.length,y.length);i++){ const d=(x[i]||0)-(y[i]||0); if(d) return d; } return 0; };
+  function drawNotes(){
+    const esc2 = t => String(t).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    $('#notesList').innerHTML = NOTES.map(n => { const rel = vcmp(n.ver,'1.1')>=0 && REPO; const cur = n.ver===CUR;
+      return `<div class="nver"><div class="nh"><b>v${esc2(n.ver)}</b>${cur?'<span class="cur">установлена сейчас</span>':''}<span class="spacer"></span>
+        ${rel?`<a class="btn small" href="https://github.com/${REPO}/releases/download/v${n.ver}/Raskladchik_v${n.ver}.zip" title="Скачать архив этой версии">Скачать</a>`:''}
+        ${rel&&!cur&&API?`<button class="btn small${vcmp(n.ver,CUR)>0?' primary':''}" data-inst="${esc2(n.ver)}">Установить</button>`:''}</div>
+        <div class="nt">${esc2(n.text.replace(/^.*\n+/, ''))}</div></div>`; }).join('');
+  }
+  $('#notesBtn').onclick = () => { drawNotes(); $('#notesMsg').textContent=''; $('#notesm').hidden=false; };
+  $('#notesClose').onclick = () => { $('#notesm').hidden=true; };
+  $('#notesm').addEventListener('click', async e => {
+    if(e.target.id==='notesm'){ $('#notesm').hidden=true; return; }
+    const b=e.target.closest('[data-inst]'); if(!b) return;
+    const v=b.dataset.inst;
+    if(!confirm('Установить Раскладчик v'+v+' вместо v'+CUR+'?\n\nПрограмма скачает эту версию и перезапустится. Списки и история сохранятся.')) return;
+    document.querySelectorAll('#notesList [data-inst]').forEach(x=>x.disabled=true); $('#notesMsg').textContent='скачиваю v'+v+'…';
+    try{
+      const r = await post('/api/update/install', {ver: v});
+      if(r.err){ $('#notesMsg').textContent=r.err; document.querySelectorAll('#notesList [data-inst]').forEach(x=>x.disabled=false); return; }
+      $('#notesMsg').textContent='перезапуск…';
+      for(let i=0;i<80;i++){ await new Promise(z=>setTimeout(z,500)); try{ const p=await (await fetch('/api/ping',{cache:'no-store'})).json(); if(p.ver===v){ location.reload(); return; } }catch(e){} }
+      $('#notesMsg').textContent='Готово — закройте окно и запустите программу снова.';
+    }catch(err){ $('#notesMsg').textContent='Ошибка: '+err.message; }
+  });
 
   // ----- окно «Сохранить в папку»: исходники не трогаем, всё — в новую папку -----
   window.SaveDlg = function(kind, count){

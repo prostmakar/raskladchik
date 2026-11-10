@@ -179,6 +179,18 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		jsonOut(w, 200, map[string]bool{"ok": true}) // новая версия сама попросит эту закрыться
+	case "/api/update/install":
+		if r.Method != http.MethodPost || !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
+			http.Error(w, "bad request", 400)
+			return
+		}
+		var req struct{ Ver string }
+		json.NewDecoder(io.LimitReader(r.Body, 1<<16)).Decode(&req)
+		if err := applyVersion(req.Ver); err != nil {
+			jsonOut(w, 200, map[string]string{"err": err.Error()})
+			return
+		}
+		jsonOut(w, 200, map[string]string{"ok": "1", "ver": strings.TrimPrefix(req.Ver, "v")})
 	case "/api/update/prev":
 		if r.Method != http.MethodPost || !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
 			http.Error(w, "bad request", 400)

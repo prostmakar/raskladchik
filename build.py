@@ -25,8 +25,24 @@ REPO = json.loads(read(os.path.join(ROOT, 'release.json'))).get('repo', '')
 NAME = 'Раскладчик'
 
 
+def release_notes():
+    """notes/v*.md -> [{ver, text}] от новых к старым (встраивается в страницу: окно «Что нового»)"""
+    out = []
+    d = os.path.join(ROOT, 'notes')
+    for f in os.listdir(d) if os.path.isdir(d) else []:
+        if f.startswith('v') and f.endswith('.md'):
+            ver = f[1:-3]
+            try:
+                key = tuple(int(x) for x in ver.split('.'))
+            except ValueError:
+                continue
+            out.append((key, ver, read(os.path.join(d, f)).strip()))
+    out.sort(reverse=True)
+    return json.dumps([{'ver': v, 'text': t} for _, v, t in out], ensure_ascii=False).replace('</', '<\\/')
+
+
 def build_page():
-    t = read(os.path.join(SRC, 'app.template.html')).replace('__APP_VER__', VERSION).replace('__APP_REPO__', REPO)
+    t = read(os.path.join(SRC, 'app.template.html')).replace('__APP_VER__', VERSION).replace('__APP_REPO__', REPO).replace('__APP_NOTES__', release_notes())
     parts = {
         '/*XTCUT*/': read(os.path.join(SRC, 'xtcut.js')),
         '/*MEDIA*/': read(os.path.join(SRC, 'media.js')),
