@@ -202,7 +202,8 @@ input::placeholder{color:var(--muted);opacity:.8}
 .nsub{margin:6px 0 10px}.nsub .nst{font-weight:600;font-size:14px;margin-bottom:3px}.nsub .cur{color:var(--accent);font-weight:600}
 .st-foot{margin-top:28px;display:flex;gap:12px;justify-content:center;align-items:center;flex-wrap:wrap;color:var(--muted);font-size:13px}
 .st-foot .new{color:var(--accent);font-weight:600}
-.st-cards{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+.st-cards{display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:820px;margin:0 auto}
+.st-cards .st-card[data-go=pdf]{grid-column:1/-1;justify-self:center;width:calc(50% - 8px)}
 .st-card{appearance:none;font:inherit;color:var(--ink);background:var(--panel);border:1.5px solid var(--line);border-radius:18px;padding:26px 22px 22px;cursor:pointer;text-align:left;display:flex;flex-direction:column;gap:8px;transition:.15s}
 .st-card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 10px 30px rgba(0,0,0,.08)}
 .st-card svg{width:120px;height:70px;color:var(--ink);margin-bottom:6px}
@@ -393,7 +394,7 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
 .prow.ck2{grid-template-columns:18px 1fr;margin-top:10px;border:0;font-weight:600}
 .btn.tog.on{background:var(--ink);color:var(--panel);border-color:var(--ink)}
 @media (max-width:1100px){ .pgrid{grid-template-columns:1fr;height:auto} .pstage{height:70vh} }
-@media (max-width:900px){ .st-cards{grid-template-columns:1fr} }
+@media (max-width:900px){ .st-cards{grid-template-columns:1fr} .st-cards .st-card[data-go=pdf]{width:100%} }
 
 @media (max-width:900px){ .ed{flex-direction:column} .ed-right{width:auto;max-width:none;flex:1.2} .ed-left{flex:1} }
 </style>
@@ -422,7 +423,6 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
     </div>
     <div class="prevbox" id="prevBox" hidden></div>
     <div class="projbox" id="projBox" hidden></div>
-    <p class="st-hint">Можно сразу перетащить файлы сюда: DXF откроются в «Листе», x_t / IGES / STEP / PDF / TIF — в «Трубах».</p>
     <div class="st-foot"><span>Раскладчик v__APP_VER__</span><span id="updMsg"></span><button class="btn" id="updBtn" hidden>Обновить</button><button class="btn" id="updPrev" hidden style="display:none">Использовать предыдущую версию</button></div>
   </div>
 </div>
@@ -441,7 +441,7 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
   <section id="tabParts">
     <div class="drop" id="drop" tabindex="0">
       <b>Перетащите сюда файлы: x_t, IGES, STEP, PDF, TIF</b>
-      <div class="hint">или нажмите, чтобы выбрать (можно сразу пачкой). 3D-модели (x_t, IGES, STEP) считаются автоматически и открываются для просмотра, PDF — с проверкой, сканы TIF — вводом размеров по чертежу.</div>
+      <div class="hint">или нажмите, чтобы выбрать</div>
       <input type="file" id="file" accept=".x_t,.X_T,.xmt_txt,.igs,.iges,.IGS,.IGES,.stp,.step,.STP,.STEP,.pdf,.tif,.tiff" multiple hidden>
     </div>
     <div class="banner" id="todo" hidden><span id="todoText"></span><span class="spacer"></span><button class="btn small primary" id="btnTodo">Заполнить</button></div>
@@ -464,10 +464,7 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
         <tfoot id="foot" hidden><tr><td>Итого</td><td></td><td class="num" id="tQty"></td><td></td><td class="num" id="tPier"></td><td class="num" id="tLen"></td><td></td></tr></tfoot>
       </table>
     </div>
-    <div class="note">
-      <b>x_t</b> — точный расчёт по 3D-модели: все контуры на наружной поверхности трубы. <b>PDF</b> — программа сама читает профиль, длину и отверстия с чертежа, проверьте и подтвердите. <b>TIF и «вручную»</b> — вводите размеры, глядя на чертёж: профиль, длину, углы торцов, отверстия, пазы.
-      «Врезка» — одна пробивка на каждый замкнутый контур. «Один торец» — для резки из хлыста, когда соседние детали разделяет общий рез. Каждый запуск программы начинается с пустого списка; прошлый проект — в «Истории проектов» на главном экране.
-    </div>
+    
   </section>
 
   <!-- ===== NESTING ===== -->
@@ -484,7 +481,7 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
     </div>
     <div id="buyOut"></div>
     <div id="nestOut"></div>
-    <div class="note">Детали группируются по профилю. Со стыковкой скосов программа переворачивает детали так, как позволяет профиль (трубу — как угодно, уголок — только без зеркального отражения), и ставит их так, чтобы соседние детали делили один косой рез. Длину хлыста можно задать отдельно для каждого профиля. «Деловой остаток» — обрезок, который выделен зелёным и пригодится для следующих заказов. <b>Деловые отходы / трубы заказчика</b> — отрезки, которые уже есть для этого заказа: программа сначала раскладывает детали на них, а оставшиеся — на целые хлысты. <b>Расстояние между деталями</b> добавляется после каждой детали; при стыковке скосов соседние детали делят один рез (≈0,3 мм).</div>
+    
   </section>
 </div>
 
@@ -503,7 +500,7 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
   <section id="sTabParts">
     <div class="drop" id="sDrop" tabindex="0">
       <b>Перетащите сюда чертежи DXF</b>
-      <div class="hint">или нажмите, чтобы выбрать (можно сразу пачкой). Программа проверит каждый чертёж и найдёт ошибки: двойные линии, «круг в круге», разрывы контуров, мусор (текст, размеры, вспомогательные линии). Исправляются они по кнопке.</div>
+      <div class="hint">или нажмите, чтобы выбрать</div>
       <input type="file" id="sFile" accept=".dxf,.DXF" multiple hidden>
     </div>
     <div class="banner" id="sBanner" hidden></div>
@@ -512,7 +509,6 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
       <div class="fld"><span>Толщина</span><select id="bT"></select></div>
       <div class="fld"><span>Газ</span><select id="bGas"></select></div>
       <button class="btn" id="bApply">Применить ко всем</button>
-      <span class="hint3">Новые чертежи получают эти значения сами. Отметьте детали галочками, чтобы задать им другие.</span>
     </div>
     <div class="bar">
       <span class="lbl" title="Концы ближе этого расстояния считаются соединёнными">Стягивать до</span><input type="text" inputmode="decimal" class="nm sm" id="sTolJ"><span class="lbl" title="Разрывы до этого расстояния закрываются отрезком">мм, закрывать до</span><input type="text" inputmode="decimal" class="nm sm" id="sTolB"><span class="lbl">мм</span>
@@ -531,11 +527,7 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
         <tfoot id="sFoot" hidden><tr><td></td><td></td><td>Итого</td><td class="num" id="sTQty"></td><td></td><td class="num" id="sTMass"></td><td class="num" id="sTLen"></td><td></td></tr></tfoot>
       </table>
     </div>
-    <div class="note">
-      Программа проверяет каждый чертёж, но <b>сама ничего не меняет</b>: найденные ошибки (двойной рез, «круг в круге», разрывы, мусор) исправляются кнопкой «Исправить» у детали или «Исправить все». Пока чертёж не исправлен, длина реза считается как есть — вместе с двойными линиями.
-      <b>Вес</b> — по площади детали (без отверстий), толщине и плотности материала. Площадь под покрытие (одна сторона и полностью) — в окне детали (🔍).
-      <b>Сохранить исправленные DXF</b> — копии в новую папку там, где укажете (можно на сервере); исходные чертежи не меняются. <b>Сохранить в Excel</b> — список деталей, а если сделана раскладка — ещё раскладка и картинки листов.
-    </div>
+    
   </section>
 
   <section id="sTabNest" hidden>
@@ -559,7 +551,7 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
     <div class="prog" id="nProg" hidden><div class="pbar"><i id="nProgBar"></i></div><span id="nProgText"></span></div>
     <div id="nState"></div>
     <div id="nOut"></div>
-    <div class="note"><b>Свободная форма</b> — детали укладываются по реальному контуру, мелкие могут встать в вырезы и отверстия крупных. <b>По габариту</b> — каждая деталь занимает свой прямоугольник. <b>Впритык</b> — одинаковые прямоугольные детали ставятся вплотную блоком, соседние кромки режутся одним резом. Зазор между деталями соблюдается не меньше заданного (точность раскладки около 1 мм). Листы с одинаковой раскладкой показаны один раз с пометкой «×N». Материал и толщина задаются у деталей; каждая пара «материал + толщина» раскладывается на свои листы.</div>
+    
   </section>
 </div>
 
@@ -571,10 +563,10 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
     <span class="spacer"></span>
     <button class="btn" id="pFindAll">Найти во всех</button>
     <button class="btn" id="pClear">Очистить</button>
-    <button class="btn" id="pToTube">Перенести в трубы →</button>
+    <button class="btn" id="pToTube">→ В трубы</button><button class="btn" id="pToSheet">→ В лист</button>
     <button class="btn primary" id="pSave">Сохранить все в PDF</button>
   </header>
-  <div class="drop slim" id="pDrop" tabindex="0"><b>Перетащите сюда PDF, TIF, JPG, PNG</b> <span class="hint">или нажмите, чтобы выбрать. Названия организаций, печати, фамилии в основной надписи находятся сами — проверьте и при необходимости выделите остальное вручную.</span>
+  <div class="drop slim" id="pDrop" tabindex="0"><b>Перетащите сюда PDF, TIF, JPG, PNG</b> <span class="hint">или нажмите, чтобы выбрать</span>
     <input type="file" id="pFile" accept=".pdf,.tif,.tiff,.jpg,.jpeg,.png,.bmp" multiple hidden></div>
   <div class="pbusy" id="pBusy" hidden></div>
   <div class="pgrid">
@@ -593,9 +585,7 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
     </div>
     <div class="pside" id="pSide"></div>
   </div>
-  <div class="note">Колесо мыши — масштаб к курсору, перетаскивание листа мышью — двигать. Оранжевые рамки — найдено автоматически, синие — выделено вручную (кнопка «Выделить» или мышь с зажатым Shift). Рамку можно передвинуть, растянуть за правый нижний угол, убрать крестиком или галочкой справа. «Как будет» — показать с закраской. «Проверено, следующий файл» — как в трубах.
-    <b>Сохранить все в PDF</b> — каждый файл (даже TIF или JPG) сохраняется как PDF в новую папку там, где укажете (можно на сервере); исходные файлы не меняются. Закрашенное удаляется по-настоящему: страница сохраняется картинкой, текста под закраской нет.
-    <b>Перенести в трубы</b> — отредактированные файлы добавляются на вкладку «Трубы», текст чертежа (кроме закрашенного) используется для чтения профиля и длины.</div>
+  
 </div>
 
 <!-- просмотр детали DXF -->
@@ -620,7 +610,7 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
 <div class="modal center" id="histm" hidden><div class="dlg wide">
   <div class="dlg-h"><h2>История проектов</h2><input type="search" id="histQ" placeholder="Поиск: название, заказчик, деталь…"><button class="ic" id="histClose">✕</button></div>
   <div class="dlg-b" id="histList"></div>
-  <div class="dlg-f"><span class="meta" id="histDir"></span><span class="spacer"></span><button class="btn" id="histChange" title="Например, общая папка на сервере — тогда все менеджеры видят одни и те же проекты">Сменить папку…</button><button class="btn" id="histFolder">Открыть папку</button></div>
+  <div class="dlg-f"><span class="meta" id="histDir"></span><span class="spacer"></span><button class="btn" id="histChange">Сменить папку…</button><button class="btn" id="histFolder">Открыть папку</button></div>
 </div></div>
 <div class="wherebar" id="whereBar" hidden></div>
 <div class="modal center" id="soonm" hidden><div class="dlg">
@@ -628,6 +618,7 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
   <div class="dlg-b soon">
     <p><b>Стоимость реза.</b> Программа посчитает, сколько стоит резать. Вы посмотрите на цифру и тихо закроете окно.</p>
     <p><b>Коммерческое предложение.</b> КП в один клик. Заказчик всё равно попросит скидку, но уже на красивом бланке.</p>
+    <p><b>Чертежи PDF и сканы на листе.</b> Из редактора PDF — прямо в «Лист». Кнопка уже есть, начинку довезём.</p>
     <p><b>Выставление счёта.</b> Самая приятная часть. Единственная, которую ждут все, кроме заказчика.</p>
     <p class="meta">Сроки: как у подрядчика — «на следующей неделе». Всё это приедет в версии 1.5.</p>
   </div>
@@ -710,6 +701,7 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
         <button class="btn small" id="vIn" title="Увеличить">+</button>
         <button class="btn small" id="vFit">По размеру</button>
         <button class="btn small" id="vRot" title="Повернуть на 90°">⟳ Повернуть</button>
+        <button class="btn small" id="vEdit" title="Закрасить организации, печати, фамилии">✎ В редактор PDF</button>
         <span class="spacer"></span>
         <button class="btn small" id="vPrev" hidden>‹</button><span class="lbl" id="vPage"></span><button class="btn small" id="vNext" hidden>›</button>
         <span class="lbl">колесо + Ctrl — масштаб, мышь — двигать</span>
@@ -942,7 +934,7 @@ function render(){
   let tq=0,tp=0,tl=0, html='';
   for(const p of st.parts){
     const [bl,bc]=p.fmt?[p.fmt,'xt']:(SRC[p.src]||SRC.man);
-    const acts = `<td class="acts">${p.src!=='xt'&&!p.err?`<button class="ic" data-edit="${p.id}" title="Открыть">✎</button>`:''}${p.src==='xt'&&p.res?`<button class="ic" data-view="${p.id}" title="Посмотреть 3D">🔍</button>`:''}<button class="ic" data-dup="${p.id}" title="Копия (например, для исполнения -01)">⧉</button><button class="ic del" data-del="${p.id}" title="Убрать">×</button></td>`;
+    const acts = `<td class="acts">${p.src!=='xt'&&!p.err?`<button class="ic" data-edit="${p.id}" title="Открыть">✎</button>`:''}${p.src==='xt'&&p.res?`<button class="ic" data-view="${p.id}" title="Посмотреть 3D">🔍</button>`:''}${(p.src==='pdf'||p.src==='tif')&&!p.err&&(previews.has(p.id)||(p.path&&Paths.api))?`<button class="ic" data-pedit="${p.id}" title="В редактор PDF">🖍</button>`:''}<button class="ic" data-dup="${p.id}" title="Копия (например, для исполнения -01)">⧉</button><button class="ic del" data-del="${p.id}" title="Убрать">×</button></td>`;
     const nameCls = !p.err && (p.src!=='xt' || p.res) ? 'name link' : 'name';
     const head = `<div class="${nameCls}" ${p.src!=='xt'&&!p.err?`data-edit="${p.id}"`:p.src==='xt'&&p.res?`data-view="${p.id}"`:''}><span class="badge ${bc}">${bl}</span>${esc(p.name||'Без названия')}${p.status==='fill'&&!p.err?'<span class="st fill">заполните</span>':p.status==='check'?'<span class="st check">проверьте</span>':''}</div>`;
     if(p.src==='xt' && !p.res && !p.err){ html+=`<tr><td>${head}<div class="meta">Считаю…</div></td><td colspan="5"></td>${acts}</tr>`; continue; }
@@ -983,7 +975,8 @@ $('#rows').addEventListener('change',e=>{
 });
 $('#rows').addEventListener('input',e=>{ const q=e.target.dataset.qty; if(!q) return; const v=Math.round(+e.target.value); if(v>=1){ byId(q).qty=v; save(); updateTotals(); } });
 $('#rows').addEventListener('click',e=>{
-  const t=e.target.closest('[data-edit],[data-dup],[data-del],[data-view]'); if(!t) return;
+  const t=e.target.closest('[data-edit],[data-dup],[data-del],[data-view],[data-pedit]'); if(!t) return;
+  if(t.dataset.pedit) editInPdf(+t.dataset.pedit);
   if(t.dataset.view) openView3d(+t.dataset.view);
   if(t.dataset.edit) openEditor(+t.dataset.edit);
   if(t.dataset.dup){ const p=byId(t.dataset.dup); const c=JSON.parse(JSON.stringify(p)); c.id=nextId++; c.name=(p.name||'')+' (копия)'; if(previews.has(p.id)) previews.set(c.id, previews.get(p.id)); st.parts.splice(st.parts.indexOf(p)+1,0,c); save(); render(); }
@@ -1068,7 +1061,8 @@ function openEditor(id){
   setTimeout(()=>{ const f=$('#edBody').querySelector('input[data-k="name"]'); if(f && !f.value) f.focus(); else { const a=$('#edBody').querySelector('input[data-k="a"]'); a&&a.focus(); } },30);
 }
 function closeEditor(){ $('#modal').hidden=true; ed=null; }
-$('#edClose').addEventListener('click',closeEditor); $('#edCancel').addEventListener('click',closeEditor);
+$('#edClose').addEventListener('click',closeEditor);
+$('#vEdit').addEventListener('click',()=>{ if(ed) editInPdf(ed.id); }); $('#edCancel').addEventListener('click',closeEditor);
 document.addEventListener('keydown',e=>{ if(e.key==='Escape' && !$('#modal').hidden) closeEditor(); });
 function commit(){
   const miss = C.validate(ed.draft);
@@ -1096,7 +1090,7 @@ function buildForm(){
       <div class="fld"><span>${L[2]}</span><input type="text" inputmode="decimal" class="nm" data-k="prof.t" value="${esc(pr.t)}"></div>
       ${pr.type==='rect'?`<div class="fld"><span>R наруж., мм</span><input type="text" inputmode="decimal" class="nm" data-k="prof.r" value="${esc(pr.r)}" placeholder="авто"></div>`:''}
     </div>
-    ${pr.type==='rect'?'<div class="hint2">R — наружный радиус углов. Пусто = 2×t, как в ГОСТ. На результат влияет мало.</div>':''}
+    
   </div>
   <div class="fs"><div class="t">Длина и торцы</div>
     <div class="row"><div class="fld"><span>Длина L, мм (наибольшая)</span><input type="text" inputmode="decimal" class="nm" data-k="L" value="${esc(d.L)}" style="width:120px"></div></div>
@@ -1113,7 +1107,6 @@ function buildForm(){
   </div>
   <div class="fs"><div class="t">Другой рез</div>
     <div class="row"><div class="fld"><span>Длина, мм</span><input type="text" inputmode="decimal" class="nm" data-k="extra" value="${esc(d.extra)}"></div><div class="fld"><span>Врезок</span><input class="mini nm" type="text" inputmode="decimal" data-k="extraN" value="${esc(d.extraN)}"></div></div>
-    <div class="hint2">Для фигурных вырезов, которых нет выше: суммарная длина контура.</div>
   </div>
   <div class="fs"><div class="t">Партия</div>
     <div class="row"><div class="fld"><span>Кол-во, шт</span><input type="text" inputmode="numeric" class="nm" data-k="qty" value="${esc(d.qty||1)}"></div>
@@ -1130,7 +1123,6 @@ function endPanel(){
     <div class="ept">Торец ${i+1} <span class="meta">${i===0?'(слева на схеме)':'(справа на схеме)'}</span><span class="spacer"></span><div class="seg sm"><button data-esel="0" class="${i===0?'on':''}">Торец 1</button><button data-esel="1" class="${i===1?'on':''}">Торец 2</button></div></div>
     <div class="row"><div class="fld"><span>Угол (градусы:минуты)</span><input type="text" data-k="ends.${i}.ang" value="${esc(e.ang)}" placeholder="38:20" style="width:110px"></div>
       <div class="fld"><span>&nbsp;</span><div class="qang">${['90','75','60','45','30'].map(a=>`<button class="btn small${String(e.ang).trim()===a?' on':''}" data-qang="${a}">${a}°</button>`).join('')}</div></div></div>
-    <div class="hint2" style="margin:-2px 0 8px">Угол с минутами — через двоеточие: <b>38:20</b> = 38°20′. Можно и 38-20, 38 20, 38,5.</div>
     <div class="row"><div class="fld"><span>Угол отложен</span><select data-k="ends.${i}.ref"><option value="axis"${e.ref!=='face'?' selected':''}>к оси (к длинной кромке)</option><option value="face"${e.ref==='face'?' selected':''}>к торцу (от перпендикуляра)</option></select></div>
       <div class="fld"><span>Длинный угол</span><div class="seg sm"><button data-long="bot" class="${ed.long[i]!=='top'?'on':''}">у начала стороны</button><button data-long="top" class="${ed.long[i]==='top'?'on':''}">у конца стороны</button></div></div>
       ${sideOpts?`<div class="fld"><span>Скос виден на стороне</span><select data-k="ends.${i}.side">${sideOpts.map(([v,t])=>`<option value="${v}"${e.side===v?' selected':''}>${t}</option>`).join('')}</select></div>`:''}</div>
@@ -1208,13 +1200,13 @@ function drawEnds(){
         const m1=S(P(Ls,u,v)), m2=S(P(L-Ls,u,v));
         return `<line x1="${a[0]}" y1="${a[1]}" x2="${m1[0]}" y2="${m1[1]}" class="e3l"/><line x1="${m2[0]}" y1="${m2[1]}" x2="${b[0]}" y2="${b[1]}" class="e3l"/>`; }).join('')}
     ${cut?[Ls, L-Ls].map(x=>`<polygon points="${out.map(([u,v])=>S(P(x,u,v)).map(q=>q.toFixed(1)).join(',')).join(' ')}" class="e3b"/>`).join(''):''}
-    ${cut?`<text x="${W/2}" y="${H-6}" text-anchor="middle" class="ea">L ${fmt(L,0)} мм — середина не показана, торцы в настоящем масштабе</text>`:''}
+    ${cut?`<text x="${W/2}" y="${H-6}" text-anchor="middle" class="ea">L ${fmt(L,0)} мм</text>`:''}
     ${ends.map((E,e)=>`<polygon points="${poly(E)}" class="e3c${ed.sel===e?' on':''}"/>`).join('')}
     <text x="${c0[0]-22}" y="${c0[1]+5}" text-anchor="end" class="et${ed.sel===0?' on':''}">1</text><text x="${c0[0]-22}" y="${c0[1]+22}" text-anchor="end" class="ea">${esc(angTxt(0))}</text>
     <text x="${c1[0]+22}" y="${c1[1]+5}" class="et${ed.sel===1?' on':''}">2</text><text x="${c1[0]+22}" y="${c1[1]+22}" class="ea">${esc(angTxt(1))}</text>
     ${dots.map(o=>`<g class="ept2${ed.sel===o.e?' sel':''}${o.isLong?' long':''}${o.inPlane?'':' oth'}" data-p3="${o.e}:${o.pl}:${o.n}"><circle cx="${o.p[0]}" cy="${o.p[1]}" r="14" fill="transparent"/><circle cx="${o.p[0]}" cy="${o.p[1]}" r="${o.isLong?7.5:5.5}"/></g>`).join('')}
     ${g&&g.bad?`<text x="${W/2}" y="${H-4}" text-anchor="middle" class="ebad">скосы не помещаются в длину — проверьте углы</text>`:''}
-  </svg><div class="meta" style="font-size:12px;text-align:center">3D-схема в настоящем масштабе: углы как на детали. Тяните мышью — вращать. Точки на торце: <b>длинный угол</b> скоса; точки на другой стороне профиля переносят скос на неё.</div>`;
+  </svg>`;
 }
 { let rd=null;
   document.addEventListener('mousedown', e=>{ const sv=e.target.closest('#endSvg'); if(!sv||!ed) return; const v=ed.view||{yaw:0.55,pitch:0.42}; rd={x:e.clientX, y:e.clientY, yaw:v.yaw, pitch:v.pitch, moved:false}; ed.rotating=true; e.preventDefault(); });
@@ -1259,6 +1251,7 @@ function updateRes(showMiss){
 const viewer=$('#viewer'), cv=$('#cv');
 async function loadPreview(){
   let pv = previews.get(ed.id);
+  { const p1=byId(ed.id); $('#vEdit').hidden = !(p1 && (p1.src==='pdf'||p1.src==='tif') && (pv || (p1.path && Paths.api))); }
   if(!pv){ const p0=byId(ed.id); if(p0 && p0.path && Paths.api){ $('#vmsg').hidden=false; $('#vmsg').textContent='Открываю чертёж: '+p0.path; try{ let b=await Paths.read(p0.path); if(!/\.pdf$/i.test(p0.path)) b=Media.tiffToPdf(b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength)); previews.set(p0.id,{bytes:b}); pv=previews.get(ed.id); }catch(err){ $('#vmsg').textContent='Чертёж не открылся: '+err.message+'. Если файл переместили — перетащите его снова.'; return; } } }
   $('#vmsg').hidden=true; cv.hidden=true; $('#vPrev').hidden=$('#vNext').hidden=true; $('#vPage').textContent='';
   if(!pv){ const p=byId(ed.id); $('#vmsg').hidden=false; $('#vmsg').textContent = p.src==='man' ? 'Деталь без чертежа — вводите размеры справа.' : (p.path ? 'Чертёж не найден: '+p.path : 'Программа не знает, откуда этот файл (его перетащили). Перетащите его снова или добавляйте файлы кнопкой — тогда путь запомнится.'); return; }
@@ -1522,14 +1515,14 @@ function renderNest(){
     });
     html+=`<div class="legend">${parts.map(p=>`<span><i style="background:${color.get(p.id)}"></i>${esc(p.name||'Деталь')} — ${fmt(partLen(p),1)} мм × ${Math.max(1,Math.round(num(p.qty))||1)}${(a=>a?`<em class="la" title="Площадь под покрытие 1 шт: наружная / полная">${m2(a.outer)}${isFinite(a.full)?' / '+m2(a.full):''} на 1 шт</em>`:'')(areaOf(p))}</span>`).join('')}</div></div>`;
   }
-  if(skipped.length) html+=`<div class="note">Не вошли в раскладку (нет профиля/длины или ждут ввода): ${skipped.map(esc).join(', ')}</div>`;
+  if(skipped.length) html+=`<div class="note">Не вошли: ${skipped.map(esc).join(', ')}</div>`;
   $('#nestOut').innerHTML=html;
   // purchase summary
   let tb=0, tm=0, tkg=0, anyKg=true, tsave=0;
   let tst=0, tao=0, taf=0, tok=true;
   const rows = lastNest.map(g=>{ tao+=g.aO; taf+=g.aF; tok=tok&&g.aOk; const m=g.R.bars*g.S/1000, kg=g.kgm*m; tb+=g.R.bars; tm+=m; tst+=g.R.stockBars; if(isFinite(kg)) tkg+=kg; else anyKg=false; tsave+=g.R0.bars-g.R.bars;
     return `<tr><td>${esc(g.pk)}</td><td class="num">${fmt(g.S,0)}</td><td class="num big">${g.R.bars}</td><td class="num">${g.R.stockBars||'—'}</td><td class="num">${fmt(m,1)}</td><td class="num">${isFinite(kg)?fmt(kg,0):'—'}</td><td class="num">${fmt(g.R.partsLen/1000,2)}</td><td class="num">${fmt(g.R.total?(1-g.R.partsLen/g.R.total)*100:0,1)}%</td><td class="num">${m2(g.aO)}</td><td class="num">${g.aOk?m2(g.aF):'—'}</td>${join?`<td class="num">${g.R0.bars-g.R.bars>0?'−'+(g.R0.bars-g.R.bars):'—'}</td>`:''}</tr>`; }).join('');
-  $('#buyOut').innerHTML = `<div class="ncard"><div class="nhead"><h3>Закупка</h3><span class="meta">масса — по сечению профиля, сталь 7850 кг/м³, ориентировочно; покрытие — площадь деталей (наружная и полная: снаружи + внутри + торцы); «из отходов» — деловые отходы и трубы заказчика, их покупать не нужно</span></div>
+  $('#buyOut').innerHTML = `<div class="ncard"><div class="nhead"><h3>Закупка</h3></div>
     <div style="overflow:auto"><table style="min-width:820px"><thead><tr><th>Профиль</th><th class="num">Хлыст, мм</th><th class="num">Купить хлыстов</th><th class="num">Из отходов</th><th class="num">Метров</th><th class="num">≈ кг</th><th class="num">Детали, м</th><th class="num">Отход</th><th class="num">Покрытие наружн.</th><th class="num">Покрытие полн.</th>${join?'<th class="num">Стыковка</th>':''}</tr></thead>
     <tbody>${rows}</tbody><tfoot><tr><td>Итого</td><td></td><td class="num">${tb}</td><td class="num">${tst||'—'}</td><td class="num">${fmt(tm,1)}</td><td class="num">${anyKg?fmt(tkg,0):fmt(tkg,0)+'+'}</td><td></td><td></td><td class="num">${m2(tao)}</td><td class="num">${tok?m2(taf):'—'}</td>${join?`<td class="num">${tsave?'−'+tsave:'—'}</td>`:''}</tr></tfoot></table></div></div>`;
 }
@@ -1578,7 +1571,17 @@ function nestSheets(){
     render();
   }
 })();
-window.__app = { st, addOne, addFiles, openEditor, showTab, render, save };
+// чертёж вернулся из редактора PDF — подменяем у детали
+function setDrawing(id, bytes){ const p=byId(id); if(!p) return false; previews.set(p.id, {bytes}); p.edited=true; save(); render(); return true; }
+async function editInPdf(id){
+  const p=byId(id); if(!p) return; let pv=previews.get(id);
+  if(!pv && p.path && Paths.api){ try{ let b=await Paths.read(p.path); if(!/\.pdf$/i.test(p.path)) b=Media.tiffToPdf(b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength)); pv={bytes:b}; previews.set(id,pv); }catch(e){ alert(e.message); return; } }
+  if(!pv){ alert('Чертежа нет — перетащите файл снова'); return; }
+  if(!$('#modal').hidden) closeEditor();
+  document.querySelector('#appTube .modesw [data-go=pdf]').click();
+  await window.__pdfedit.takeBytes((p.name||'Чертёж')+'.pdf', pv.bytes, {mod:'tube', id});
+}
+window.__app = { st, addOne, addFiles, openEditor, showTab, render, save, setDrawing, editInPdf };
 window.__pdf = { lib: pdfLib, open: openPdf };
 })();
 </script>
@@ -1724,7 +1727,7 @@ window.__pdf = { lib: pdfLib, open: openPdf };
     el.hidden = false;
     const has = info.tubes || info.sheets;
     const q = t => String(t||'').replace(/"/g,'&quot;');
-    el.innerHTML = `<div class="pjrow"><span class="pjl">Проект:</span><input class="pn" id="pjName" placeholder="Название проекта" value="${q(meta&&meta.name)}"><input class="pc" id="pjCust" placeholder="Заказчик" value="${q(meta&&meta.customer)}"><span class="meta">${has ? (info.tubes?'трубы '+info.tubes:'') + (info.tubes&&info.sheets?' · ':'') + (info.sheets?'лист '+info.sheets:'') + ' дет. · сохраняется само' : 'пока без деталей — добавьте файлы в «Трубы» или «Лист»'}</span></div>
+    el.innerHTML = `<div class="pjrow"><span class="pjl">Проект:</span><input class="pn" id="pjName" placeholder="Название проекта" value="${q(meta&&meta.name)}"><input class="pc" id="pjCust" placeholder="Заказчик" value="${q(meta&&meta.customer)}"><span class="meta">${has ? (info.tubes?'трубы '+info.tubes:'') + (info.tubes&&info.sheets?' · ':'') + (info.sheets?'лист '+info.sheets:'') + ' дет.' : ''}</span></div>
       <div class="pjrow btns"><button class="btn small" id="pjNew">＋ Новый проект</button><button class="btn small" id="pjHist">🗂 История проектов</button><button class="btn small" id="pjOpen">📂 Открыть проект из файла…</button><button class="btn small" id="pjExport"${has||meta?'':' disabled'}>💾 Сохранить проект в файл…</button></div>`;
     const upd = () => { let m = J('proj.cur');
       if(!m){ m = { id: newId(), name: '', auto: false, customer: '', comment: '', created: Date.now() }; }
@@ -1744,7 +1747,7 @@ window.__pdf = { lib: pdfLib, open: openPdf };
     const info = projInfo(JSON.parse(tr||'null'), JSON.parse(sr||'null'));
     const body = '{"name":' + JSON.stringify(m.name || 'Проект') + ',"data":{"raskl":1,"app":"__APP_VER__","meta":' + JSON.stringify(Object.assign({}, m, info, {updated: Date.now()})) + ',"tube":' + (tr||'null') + ',"sheet":' + (sr||'null') + '}}';
     const r = await fetch('/api/proj/export', {method:'POST', headers:{'Content-Type':'application/json'}, body}).then(r=>r.json()).catch(e=>({error:e.message}));
-    if(r.error) alert('Не сохранилось: ' + r.error); else if(r.path) alert('Проект сохранён:\n' + r.path + '\n\nЧертежи в файл не кладутся — у коллеги они откроются по тем же путям на сервере.');
+    if(r.error) alert('Не сохранилось: ' + r.error); else if(r.path) alert('Проект сохранён:\n' + r.path);
   }
   async function importProj(path){
     if(typeof path !== 'string'){ const ps = await Paths.pick('raskl'); if(!ps.length) return; path = ps[0].path; }
@@ -1780,7 +1783,7 @@ window.__pdf = { lib: pdfLib, open: openPdf };
       <div class="hm">${m.customer?'Заказчик: <b>'+esc2(m.customer)+'</b> · ':''}${m.tubes?'трубы — '+m.tubes+' дет.':''}${m.tubes&&m.sheets?', ':''}${m.sheets?'лист — '+m.sheets+' дет.':''}${m.names&&m.names.length?' · '+esc2(m.names.slice(0,6).join(', '))+(m.names.length>6?'…':''):''}</div>
       <div class="hd">${dt(m.updated)}${m.created&&dt(m.created)!==dt(m.updated)?'<br><span style="opacity:.7">создан '+dt(m.created)+'</span>':''}</div>
       <div class="hb">${m.id===cur?'':`<button class="btn small primary" data-hopen="${esc2(m.id)}">Открыть</button>`}<button class="ic" data-hdel="${esc2(m.id)}" title="Удалить из истории">🗑</button></div></div>`).join('')
-      : `<div class="meta">${histItems.length?'Ничего не найдено':'История пока пуста: проекты сохраняются сами, как только в них появляются детали.'}</div>`;
+      : `<div class="meta">${histItems.length?'Ничего не найдено':'Пусто'}</div>`;
   }
   if(API){
     $('#histQ').addEventListener('input', drawHist);
@@ -1816,7 +1819,7 @@ window.__pdf = { lib: pdfLib, open: openPdf };
     const need = [...(T?T.parts:[]), ...(Sh?Sh.parts:[])].filter(p => !p.path && p.file && names.has(p.file.toLowerCase()));
     if(!need.length) return;
     const bar = $('#whereBar');
-    bar.innerHTML = `<span>Чтобы проект помнил чертежи, укажите папку, откуда перетащили файлы (${need.length}). Windows программе этого не говорит — секретничает.</span><button class="btn small primary" id="whereOk">Указать папку…</button><button class="ic" id="whereNo" title="Не сейчас">✕</button>`;
+    bar.innerHTML = `<span>Откуда файлы (${need.length})?</span><button class="btn small primary" id="whereOk">Указать папку…</button><button class="ic" id="whereNo" title="Не сейчас">✕</button>`;
     bar.hidden = false;
     $('#whereNo').onclick = () => { bar.hidden = true; };
     $('#whereOk').onclick = async () => {
@@ -1828,7 +1831,7 @@ window.__pdf = { lib: pdfLib, open: openPdf };
       const found = f.found || {}; let n = 0;
       for(const p of need){ const path = found[p.file.toLowerCase()]; if(path){ p.path = path; n++; } }
       if(T) window.__app.save(); if(Sh) window.__sheet.save();
-      bar.innerHTML = `<span>${n===need.length ? 'Готово: все ' + n + ' путей запомнены.' : 'Нашёл ' + n + ' из ' + need.length + '. Остальные, видимо, ушли в другую папку — без записки.'}</span><button class="ic" id="whereNo2">✕</button>`;
+      bar.innerHTML = `<span>${n===need.length ? 'Готово: все ' + n + ' путей запомнены.' : 'Нашёл ' + n + ' из ' + need.length}</span><button class="ic" id="whereNo2">✕</button>`;
       $('#whereNo2').onclick = () => { bar.hidden = true; }; setTimeout(()=>{ bar.hidden = true; }, 6000);
     };
   };
@@ -1882,7 +1885,7 @@ window.__pdf = { lib: pdfLib, open: openPdf };
       const what = kind === 'pdf' ? 'Отредактированные PDF' : 'Исправленные DXF';
       $('#sdTitle').textContent = `Сохранить ${count} ${kind==='pdf'?'PDF':'DXF'}`;
       $('#sdBase').value = base; $('#sdName').value = (meta && meta.name && !meta.auto ? meta.name + ' — ' : '') + what + ' ' + stamp;
-      $('#sdNote').innerHTML = 'Исходные файлы <b>не изменяются</b>: в выбранном месте создаётся новая папка, а если файл с таким именем уже есть — новый получит номер «(2)». Пусто в «Куда» — на рабочий стол.';
+      $('#sdNote').innerHTML = '';
       $('#sdlg').hidden = false; setTimeout(()=>{ $('#sdName').focus(); $('#sdName').select(); }, 30);
       const done = v => { $('#sdlg').hidden = true; $('#sdOk').onclick = $('#sdCancel').onclick = $('#sdClose').onclick = $('#sdPick').onclick = null; resolve(v); };
       $('#sdCancel').onclick = $('#sdClose').onclick = () => done(null);

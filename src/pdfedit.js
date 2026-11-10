@@ -33,7 +33,7 @@
   async function addFiles(list) {
     for (const f of [...list]) {
       const e = extOf(f.name);
-      const file = { id: nextId++, name: f.name, pages: [], status: 'load', err: null };
+      const file = { id: nextId++, name: f.name, pages: [], status: 'load', err: null, origin: f.origin || null };
       st.files.push(file); renderList();
       try {
         let bytes = await readBytes(f);
@@ -46,7 +46,7 @@
         file.status = 'new';
         await findAuto(file);
       } catch (err) { file.err = (err && err.message) || 'Не удалось открыть файл'; file.status = 'err'; }
-      if (!st.cur && !file.err) { st.cur = file; st.page = 0; st.zoom = 0; }
+      if ((!st.cur || f.origin) && !file.err) { st.cur = file; st.page = 0; st.zoom = 0; }
       renderList(); if (st.cur === file) showPage();
     }
     renderAll();
@@ -340,12 +340,12 @@
     if (!f || !f.pages[st.page]) { el.innerHTML = ''; return; }
     const pg = f.pages[st.page];
     el.innerHTML = `<div class="fs"><div class="t">Закрасить на странице</div>
-      ${pg.boxes.length ? pg.boxes.map((b, i) => `<label class="prow"><input type="checkbox" data-on="${i}"${b.on ? ' checked' : ''}><span>${esc(b.label)}</span><em>${b.src === 'auto' ? 'авто' : 'вручную'}</em><button class="ic del" data-bdel="${i}" title="Убрать">×</button></label>`).join('') : '<div class="meta">Ничего не найдено. Выделите вручную: кнопка «Выделить» и мышью прямоугольник.</div>'}
+      ${pg.boxes.length ? pg.boxes.map((b, i) => `<label class="prow"><input type="checkbox" data-on="${i}"${b.on ? ' checked' : ''}><span>${esc(b.label)}</span><em>${b.src === 'auto' ? 'авто' : 'вручную'}</em><button class="ic del" data-bdel="${i}" title="Убрать">×</button></label>`).join('') : '<div class="meta">Ничего не найдено</div>'}
       </div>
-      ${pg.scanned ? '<div class="hint2">Это скан: текста в нём нет. Автоматически находятся цветные печати и подписи, а графы основной надписи (фамилии, организация) — по размерам ГОСТ от рамки чертежа. Проверьте рамки, остальное выделите вручную.</div>' : ''}
+      
       <label class="prow ck2"><input type="checkbox" id="pChecked"${f.checked ? ' checked' : ''}><span>Файл проверен</span></label>
       <button class="btn primary pnext" id="pGoNext">${st.page < f.pages.length - 1 ? 'Дальше: стр. ' + (st.page + 2) + ' →' : 'Проверено, следующий файл →'}</button>
-      <div class="meta">${(() => { const left = st.files.filter(x => !x.err && !x.checked && x !== f).length; return left ? 'Осталось непроверенных: ' + left : 'Это последний непроверенный файл'; })()}</div>`;
+      <div class="meta">${(() => { const left = st.files.filter(x => !x.err && !x.checked && x !== f).length; return left ? 'Осталось: ' + left : ''; })()}</div>`;
     $('#pChecked').onchange = e => { f.checked = e.target.checked; renderList(); };
     $('#pGoNext').onclick = goNext;
   }
@@ -515,6 +515,8 @@
       for (let i = 0; i < list.length; i++) {
         progress(`Переношу в трубы: ${i + 1} из ${list.length}…`);
         const f = list[i]; const bytes = await outFile(f); const items = await keptText(f);
+        // пришёл из «Труб» — возвращаем в ту же деталь, иначе — новая деталь
+        if (f.origin && f.origin.mod === 'tube' && window.__app.setDrawing && window.__app.setDrawing(f.origin.id, bytes)) continue;
         await window.__app.addOne(baseName(f.name) + '.pdf', async () => '', async () => bytes, items);
       }
       document.querySelector('#appPdf .modesw [data-go=tube]').click();
@@ -525,6 +527,15 @@
   $('#pFindAll').addEventListener('click', findAll);
   $('#pSave').addEventListener('click', saveAll);
   $('#pToTube').addEventListener('click', toTubes);
+  $('#pToSheet').addEventListener('click', () => toast('Чертежи PDF на листе — скоро'));
+  // принять чертёж из «Труб» (или «Листа») на редактирование
+  async function takeBytes(name, bytes, origin) {
+    const f = new File([bytes], name); f.origin = origin;
+    const old = st.files.find(x => x.origin && origin && x.origin.mod === origin.mod && x.origin.id === origin.id);
+    if (old) st.files.splice(st.files.indexOf(old), 1);
+    if (st.cur === old) st.cur = null;
+    await addFiles([f]);
+  }
   $('#pClear').addEventListener('click', () => { if (st.files.length && !confirm('Убрать все файлы?')) return; st.files = []; st.cur = null; renderAll(); });
 
   let toastT = null;
@@ -543,5 +554,5 @@
   window.addEventListener('drop', e => { if (window.__mode !== 'pdf') return; e.preventDefault(); if (e.dataTransfer && e.dataTransfer.files.length) addFiles(e.dataTransfer.files); });
 
   function renderAll() { renderList(); showPage(); }
-  window.__pdfedit = { st, addFiles, renderAll, findAll, saveAll, toTubes, outFile, keptText, fixText, show: () => { st.zoom = 0; renderAll(); } };
+  window.__pdfedit = { st, takeBytes, addFiles, renderAll, findAll, saveAll, toTubes, outFile, keptText, fixText, show: () => { st.zoom = 0; renderAll(); } };
 })();
