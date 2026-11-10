@@ -1,9 +1,11 @@
-# Выпуск версии: git tag v1.2 && git push origin v1.2
-# Собирает Раскладчик.exe и публикует релиз (описание — notes/<тег>.md).
+# Выпуск версии: поднять номер в файле VERSION (и добавить notes/v<версия>.md) и отправить в main.
+# Если релиза с такой версией ещё нет — собирает Раскладчик.exe и публикует релиз v<версия>.
 name: release
 on:
   push:
-    tags: ['v*']
+    branches: [main]
+    paths: ['VERSION']
+  workflow_dispatch:
 permissions:
   contents: write
 jobs:
@@ -14,21 +16,30 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: launcher/go.mod
-      - name: Версия совпадает с тегом
-        run: test "v$(cat VERSION | tr -d '[:space:]')" = "${GITHUB_REF_NAME}"
+      - name: Версия
+        id: v
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v$(tr -d '[:space:]' < VERSION)"; echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          if gh release view "$TAG" >/dev/null 2>&1; then echo "exists=1" >> "$GITHUB_OUTPUT"; echo "Релиз $TAG уже есть"; fi
       - name: Тесты
+        if: steps.v.outputs.exists != '1'
         run: |
           node tests/test_calc.js
           node tests/test_dxf.js
       - name: Сборка
+        if: steps.v.outputs.exists != '1'
         run: python3 build.py
       - name: Релиз
+        if: steps.v.outputs.exists != '1'
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.v.outputs.tag }}
         run: |
           mkdir -p "rel/Раскладчик"
           cp "dist/Раскладчик.exe" "Как пользоваться.txt" "rel/Раскладчик/"
-          (cd rel && zip -qr "../Raskladchik_${GITHUB_REF_NAME}.zip" "Раскладчик")
+          (cd rel && zip -qr "../Raskladchik_${TAG}.zip" "Раскладчик")
           cp "dist/Раскладчик.exe" Raskladchik.exe
-          NOTES="notes/${GITHUB_REF_NAME}.md"; [ -f "$NOTES" ] || echo "Раскладчик ${GITHUB_REF_NAME}" > "$NOTES"
-          gh release create "${GITHUB_REF_NAME}" --title "Раскладчик ${GITHUB_REF_NAME}" --notes-file "$NOTES" Raskladchik.exe "Raskladchik_${GITHUB_REF_NAME}.zip"
+          NOTES="notes/${TAG}.md"; [ -f "$NOTES" ] || echo "Раскладчик ${TAG}" > "$NOTES"
+          gh release create "${TAG}" --target "${GITHUB_SHA}" --title "Раскладчик ${TAG}" --notes-file "$NOTES" Raskladchik.exe "Raskladchik_${TAG}.zip"
