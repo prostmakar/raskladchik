@@ -158,7 +158,7 @@ tfoot td{border-bottom:0;background:var(--soft);font-weight:700}
 input::placeholder{color:var(--muted);opacity:.8}
 .endsk{margin:6px 0 4px}
 .endsvg{width:100%;height:auto;display:block;max-height:150px}
-.endsvg{max-height:210px;cursor:ew-resize}.endsvg .e3l{stroke:var(--accent);stroke-width:1.4;opacity:.75}
+.endsvg{max-height:250px;cursor:grab}.endsvg .e3b{fill:none;stroke:var(--muted);stroke-width:1.2;stroke-dasharray:5 4}.endsvg .e3l{stroke:var(--accent);stroke-width:1.4;opacity:.75}
 .endsvg .e3c{fill:color-mix(in srgb, var(--accent) 20%, transparent);stroke:var(--accent);stroke-width:2}.endsvg .e3c.on{fill:color-mix(in srgb, var(--accent) 38%, transparent)}
 .endsvg .ept2.oth circle+circle{opacity:.55}
 .endsvg .ept2{cursor:pointer}.endsvg .ept2 circle+circle{fill:var(--card,#fff);stroke:var(--muted);stroke-width:2}
@@ -1123,19 +1123,28 @@ function drawEnds(){
   const skewOf = i => { try{ return C.endAngleToAxis(d.ends[i])<89.99; }catch(e){ return false; } };
   const L = g&&g.L>0 ? g.L : 1000, A = g ? g.A : 40, B = g ? (pr.type==='round'?g.A:g.B) : 25;
   const tt = Math.min(num(pr.t)||Math.min(A,B)*0.1, Math.min(A,B)/3);
-  const k = Math.max(1, 0.2*L/Math.max(A,B,1));                 // сечение крупнее для наглядности
+  // настоящий масштаб (углы не искажаются); длинную середину не рисуем — разрыв
   const lo = g ? g.lo : [0,0,0,0], ro = g ? g.ro : [L,L,L,L];
   // смещение торца в точке сечения (u — сторона A, v — сторона B), билинейно по углам модели
   const offAt = (arr,u,v) => { let ti=(u+A/2)/A, tj=(v+B/2)/B; if(flipPlane==='a') ti=1-ti; if(flipPlane==='b') tj=1-tj; ti=Math.max(0,Math.min(1,ti)); tj=Math.max(0,Math.min(1,tj));
     return arr[0]*(1-ti)*(1-tj) + arr[1]*(1-ti)*tj + arr[2]*ti*(1-tj) + arr[3]*ti*tj; };
   const out = sectionOutline(pr, A, B, tt);
-  const rot = ed.rot3 || 0, cr=Math.cos(rot), sr=Math.sin(rot);
-  const P = (x,u,v) => { const u2=(u*cr - v*sr)*k, v2=(u*sr + v*cr)*k; return [x + v2*0.55, -u2 - v2*0.32, v2]; };
+  const D = Math.max(A, B, 1);
+  const maxOff = Math.max(...lo, ...[0,1,2,3].map(i=>L-ro[i]), 0);
+  const Ls = Math.max(1.6*D, maxOff + 1.0*D), gap = 0.7*D, cut = L > 2*Ls + gap; // показываем по Ls от каждого торца
+  const CX = x => !cut ? x : x <= Ls ? x : x >= L-Ls ? x - (L - 2*Ls) + gap : (x < L/2 ? Ls : Ls + gap);
+  const Lc = cut ? 2*Ls + gap : L;
+  const vw = ed.view || (ed.view = {yaw: 0.28, pitch: 0.38});
+  const cy=Math.cos(vw.yaw), sy=Math.sin(vw.yaw), cp=Math.cos(vw.pitch), sp=Math.sin(vw.pitch);
+  // X — ось трубы, u — сторона A (вверх), v — сторона B (вглубь); поворот вокруг вертикали и наклон
+  const P = (x,u,v) => { const X=CX(x)-Lc/2; const x1=X*cy + v*sy, z1=-X*sy + v*cy; const y2=u*cp - z1*sp; return [x1, -y2, u*sp + z1*cp]; };
   const ends = [0,1].map(e => out.map(([u,v]) => P(e ? offAt(ro,u,v) : offAt(lo,u,v), u, v)));
-  // рамка
-  let x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity; for(const E of ends) for(const [x,y] of E){ x0=Math.min(x0,x); x1=Math.max(x1,x); y0=Math.min(y0,y); y1=Math.max(y1,y); }
-  const W=600, H=190, pad=34, sc=Math.min((W-2*pad)/(x1-x0||1), (H-2*pad)/(y1-y0||1));
-  const S = ([x,y]) => [pad + (x-x0)*sc + ((W-2*pad)-(x1-x0)*sc)/2, pad + (y-y0)*sc + ((H-2*pad)-(y1-y0)*sc)/2];
+  // масштаб — по описанной сфере, чтобы при вращении размер не прыгал
+  // масштаб и центр: по картинке; пока вращают мышью — прежние, чтобы не прыгало
+  const W=600, H=250;
+  if(!ed.rotating || !vw.sc){ let x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity; for(const E of ends) for(const [x,y] of E){ x0=Math.min(x0,x); x1=Math.max(x1,x); y0=Math.min(y0,y); y1=Math.max(y1,y); }
+    vw.sc = Math.min((W-90)/(x1-x0||1), (H-50)/(y1-y0||1)); vw.cx=(x0+x1)/2; vw.cy=(y0+y1)/2; }
+  const sc=vw.sc, S = ([x,y]) => [W/2 + (x-vw.cx)*sc, H/2 - 6 + (y-vw.cy)*sc];
   const poly = pts => pts.map(p=>S(p).map(v=>v.toFixed(1)).join(',')).join(' ');
   // продольные рёбра: у профилей — в углах сечения, у круглой — по силуэту
   let longi = [];
@@ -1156,18 +1165,23 @@ function drawEnds(){
   const angTxt = i => { const e=d.ends[i]; const a=String(e.ang||'90').trim(); return (a||'90')+(/[°'′]/.test(a)?'':'°')+(e.ref==='face'?' к торцу':''); };
   const c0 = S(P(offAt(lo,0,0),0,0)), c1 = S(P(offAt(ro,0,0),0,0));
   box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" class="endsvg" id="endSvg">
-    ${longi.map(i=>{ const a=S(ends[0][i]), b=S(ends[1][i]); return `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" class="e3l"/>`; }).join('')}
+    ${longi.map(i=>{ const [u,v]=out[i]; const a=S(ends[0][i]), b=S(ends[1][i]);
+        if(!cut) return `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" class="e3l"/>`;
+        const m1=S(P(Ls,u,v)), m2=S(P(L-Ls,u,v));
+        return `<line x1="${a[0]}" y1="${a[1]}" x2="${m1[0]}" y2="${m1[1]}" class="e3l"/><line x1="${m2[0]}" y1="${m2[1]}" x2="${b[0]}" y2="${b[1]}" class="e3l"/>`; }).join('')}
+    ${cut?[Ls, L-Ls].map(x=>`<polygon points="${out.map(([u,v])=>S(P(x,u,v)).map(q=>q.toFixed(1)).join(',')).join(' ')}" class="e3b"/>`).join(''):''}
+    ${cut?`<text x="${W/2}" y="${H-6}" text-anchor="middle" class="ea">L ${fmt(L,0)} мм — середина не показана, торцы в настоящем масштабе</text>`:''}
     ${ends.map((E,e)=>`<polygon points="${poly(E)}" class="e3c${ed.sel===e?' on':''}"/>`).join('')}
     <text x="${c0[0]-22}" y="${c0[1]+5}" text-anchor="end" class="et${ed.sel===0?' on':''}">1</text><text x="${c0[0]-22}" y="${c0[1]+22}" text-anchor="end" class="ea">${esc(angTxt(0))}</text>
     <text x="${c1[0]+22}" y="${c1[1]+5}" class="et${ed.sel===1?' on':''}">2</text><text x="${c1[0]+22}" y="${c1[1]+22}" class="ea">${esc(angTxt(1))}</text>
     ${dots.map(o=>`<g class="ept2${ed.sel===o.e?' sel':''}${o.isLong?' long':''}${o.inPlane?'':' oth'}" data-p3="${o.e}:${o.pl}:${o.n}"><circle cx="${o.p[0]}" cy="${o.p[1]}" r="14" fill="transparent"/><circle cx="${o.p[0]}" cy="${o.p[1]}" r="${o.isLong?7.5:5.5}"/></g>`).join('')}
     ${g&&g.bad?`<text x="${W/2}" y="${H-4}" text-anchor="middle" class="ebad">скосы не помещаются в длину — проверьте углы</text>`:''}
-  </svg><div class="meta" style="font-size:12px;text-align:center">3D-схема (сечение увеличено). Тяните мышью — повернуть вокруг оси. Точки на торце: <b>длинный угол</b> скоса; точки на другой стороне профиля переносят скос на неё.</div>`;
+  </svg><div class="meta" style="font-size:12px;text-align:center">3D-схема в настоящем масштабе: углы как на детали. Тяните мышью — вращать. Точки на торце: <b>длинный угол</b> скоса; точки на другой стороне профиля переносят скос на неё.</div>`;
 }
 { let rd=null;
-  document.addEventListener('mousedown', e=>{ const sv=e.target.closest('#endSvg'); if(!sv||!ed) return; rd={x:e.clientX, r:ed.rot3||0, moved:false}; });
-  window.addEventListener('mousemove', e=>{ if(!rd||!ed) return; const dx=e.clientX-rd.x; if(Math.abs(dx)>3){ rd.moved=true; ed.rot3 = rd.r + dx*0.012; drawEnds(); } });
-  window.addEventListener('mouseup', ()=>{ if(rd&&rd.moved&&ed) ed.dragged=true; setTimeout(()=>{ if(ed) ed.dragged=false; },0); rd=null; });
+  document.addEventListener('mousedown', e=>{ const sv=e.target.closest('#endSvg'); if(!sv||!ed) return; const v=ed.view||{yaw:0.55,pitch:0.42}; rd={x:e.clientX, y:e.clientY, yaw:v.yaw, pitch:v.pitch, moved:false}; ed.rotating=true; e.preventDefault(); });
+  window.addEventListener('mousemove', e=>{ if(!rd||!ed) return; const dx=e.clientX-rd.x, dy=e.clientY-rd.y; if(rd.moved || Math.hypot(dx,dy)>3){ rd.moved=true; Object.assign(ed.view||(ed.view={}), {yaw: rd.yaw + dx*0.01, pitch: Math.max(-1.5, Math.min(1.5, rd.pitch + dy*0.01))}); drawEnds(); } });
+  window.addEventListener('mouseup', ()=>{ if(ed && ed.rotating){ ed.rotating=false; if(rd&&rd.moved) drawEnds(); } if(rd&&rd.moved&&ed) ed.dragged=true; setTimeout(()=>{ if(ed) ed.dragged=false; },0); rd=null; });
 }
 function setPath(obj, path, val){ const ks=path.split('.'); let o=obj; for(let i=0;i<ks.length-1;i++) o=o[ks[i]]; o[ks[ks.length-1]]=val; }
 $('#edBody').addEventListener('input',e=>{ const k=e.target.dataset.k; if(!k||!ed) return; setPath(ed.draft,k,e.target.value); updateRes(); });
