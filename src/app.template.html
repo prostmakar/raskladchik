@@ -1664,8 +1664,9 @@ window.__pdf = { lib: pdfLib, open: openPdf };
   async function saveProj1(force){
     const tr = localStorage.getItem('xtcut.v2'), sr = localStorage.getItem('sheet.v1');
     const tube = JSON.parse(tr||'null'), sheet = JSON.parse(sr||'null');
-    const info = projInfo(tube, sheet); if(!info.tubes && !info.sheets) return;
+    const info = projInfo(tube, sheet);
     let meta = J('proj.cur');
+    if(!info.tubes && !info.sheets && !(meta && !meta.auto)) return; // пустой проект сохраняем, только если ему дали название
     if(!meta){ meta = { id: newId(), name: autoName(info), auto: true, customer: '', comment: '', created: Date.now() }; localStorage.setItem('proj.cur', JSON.stringify(meta)); }
     if(meta.auto) meta.name = autoName(info, meta.created); // пока название не задали вручную — по дате и деталям
     const data = '{"v":1,"tube":' + (tr||'null') + ',"sheet":' + (sr||'null') + '}';
@@ -1700,26 +1701,37 @@ window.__pdf = { lib: pdfLib, open: openPdf };
     }catch(e){ alert('Проект слишком большой для окна программы: ' + e.message); return; }
     location.reload();
   }
-  async function newProj(){
+  async function newProj(name, customer){
     await saveProj(true);
     const clear = k => { const d = J(k); if(!d) return; d.parts = []; if(k==='xtcut.v2' && d.nest) d.nest.stock = {}; delete d.result; localStorage.setItem(k, JSON.stringify(d)); };
-    clear('xtcut.v2'); clear('sheet.v1'); localStorage.removeItem('proj.cur');
+    clear('xtcut.v2'); clear('sheet.v1');
+    const meta = { id: newId(), name: name || '', auto: !name, customer: customer || '', comment: '', created: Date.now() };
+    if(!meta.name) meta.name = autoName({names: []}, meta.created);
+    localStorage.setItem('proj.cur', JSON.stringify(meta));
+    lastSaved = ''; await saveProj(true);
     location.reload();
+  }
+  function newProjDlg(){ // сразу с названием и заказчиком — файлы можно добавить потом
+    const name = prompt('Название нового проекта (можно оставить пустым — подставится дата):', '');
+    if(name === null) return;
+    const cust = prompt('Заказчик (можно пусто):', '') ;
+    if(cust === null) return;
+    newProj(name.trim(), (cust||'').trim());
   }
   function projBox(){
     const el = $('#projBox'); if(!API){ el.hidden = true; return; }
-    const meta = J('proj.cur'); const info = projInfo(J('xtcut.v2'), J('sheet.v1'));
+    let meta = J('proj.cur'); const info = projInfo(J('xtcut.v2'), J('sheet.v1'));
     el.hidden = false;
     const has = info.tubes || info.sheets;
     const q = t => String(t||'').replace(/"/g,'&quot;');
-    el.innerHTML = `<div class="pjrow">${has
-        ? `<span class="pjl">Проект:</span><input class="pn" id="pjName" placeholder="Название проекта" value="${q(meta&&meta.name)}"><input class="pc" id="pjCust" placeholder="Заказчик" value="${q(meta&&meta.customer)}"><span class="meta">${info.tubes?'трубы '+info.tubes:''}${info.tubes&&info.sheets?' · ':''}${info.sheets?'лист '+info.sheets:''} дет. · сохраняется само</span>`
-        : `<span class="pjl">Новый проект</span><span class="meta">добавьте файлы в «Трубы» или «Лист» — проект сохранится сам</span>`}</div>
-      <div class="pjrow btns"><button class="btn small" id="pjNew"${has?'':' disabled'}>＋ Новый проект</button><button class="btn small" id="pjHist">🗂 История проектов</button><button class="btn small" id="pjOpen">📂 Открыть проект из файла…</button><button class="btn small" id="pjExport"${has?'':' disabled'}>💾 Сохранить проект в файл…</button></div>`;
-    const upd = () => { let m = J('proj.cur'); const go2 = m2 => { m2.name=$('#pjName').value; m2.customer=$('#pjCust').value; m2.auto=false; localStorage.setItem('proj.cur', JSON.stringify(m2)); saveProj(true); projTag(); };
-      if(!m){ saveProj(true).then(()=>{ const m2=J('proj.cur'); if(m2) go2(m2); }); return; } go2(m); };
-    if(has){ $('#pjName').onchange = upd; $('#pjCust').onchange = upd; }
-    $('#pjNew').onclick = () => { if(confirm('Начать новый проект? Текущий уже сохранён в истории — его можно открыть оттуда.')) newProj(); };
+    el.innerHTML = `<div class="pjrow"><span class="pjl">Проект:</span><input class="pn" id="pjName" placeholder="Название проекта" value="${q(meta&&meta.name)}"><input class="pc" id="pjCust" placeholder="Заказчик" value="${q(meta&&meta.customer)}"><span class="meta">${has ? (info.tubes?'трубы '+info.tubes:'') + (info.tubes&&info.sheets?' · ':'') + (info.sheets?'лист '+info.sheets:'') + ' дет. · сохраняется само' : 'пока без деталей — добавьте файлы в «Трубы» или «Лист»'}</span></div>
+      <div class="pjrow btns"><button class="btn small" id="pjNew">＋ Новый проект</button><button class="btn small" id="pjHist">🗂 История проектов</button><button class="btn small" id="pjOpen">📂 Открыть проект из файла…</button><button class="btn small" id="pjExport"${has||meta?'':' disabled'}>💾 Сохранить проект в файл…</button></div>`;
+    const upd = () => { let m = J('proj.cur');
+      if(!m){ m = { id: newId(), name: '', auto: false, customer: '', comment: '', created: Date.now() }; }
+      m.name = $('#pjName').value.trim() || autoName(info, m.created); m.customer = $('#pjCust').value.trim(); m.auto = !$('#pjName').value.trim();
+      localStorage.setItem('proj.cur', JSON.stringify(m)); saveProj(true); projTag(); $('#pjExport').disabled = false; };
+    $('#pjName').onchange = upd; $('#pjCust').onchange = upd;
+    $('#pjNew').onclick = () => { if(has && !confirm('Начать новый проект? Текущий уже сохранён в истории — его можно открыть оттуда.')) return; newProjDlg(); };
     $('#pjHist').onclick = openHist;
     $('#pjOpen').onclick = importProj;
     $('#pjExport').onclick = exportProj;

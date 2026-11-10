@@ -3,11 +3,13 @@
 package main
 
 import (
+	"encoding/base64"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"syscall"
+	"unicode/utf16"
 	"unsafe"
 )
 
@@ -55,26 +57,27 @@ func documentsDir() string {
 // окно выбора папки Windows (в том числе сетевой); "" — отменили
 func pickFolder(start, prompt string) (string, error) {
 	q := func(s string) string { return "'" + strings.ReplaceAll(s, "'", "''") + "'" }
-	script := "[Console]::OutputEncoding=[Text.Encoding]::UTF8;" +
-		"Add-Type -AssemblyName System.Windows.Forms;" +
+	script := "Add-Type -AssemblyName System.Windows.Forms;" +
 		"$f=New-Object System.Windows.Forms.FolderBrowserDialog;" +
 		"$f.Description=" + q(prompt) + ";$f.ShowNewFolderButton=$true;" +
 		"if(Test-Path -LiteralPath " + q(start) + "){$f.SelectedPath=" + q(start) + "};" +
-		"$o=New-Object System.Windows.Forms.Form -Property @{TopMost=$true;ShowInTaskbar=$false};" +
-		"if($f.ShowDialog($o) -eq 'OK'){Write-Output $f.SelectedPath}"
-	cmd := exec.Command("powershell.exe", "-NoProfile", "-STA", "-ExecutionPolicy", "Bypass", "-Command", script)
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
-	out, err := cmd.Output()
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(strings.TrimPrefix(string(out), "\ufeff")), nil
+		ownerPS +
+		"if($f.ShowDialog($o) -eq 'OK'){Write-Output $f.SelectedPath};$o.Close()"
+	out, err := runPS(script)
+	return strings.TrimSpace(out), err
 }
 
 func openFolder(d string) { exec.Command("explorer.exe", d).Start() }
 
 func runPS(script string) (string, error) {
-	cmd := exec.Command("powershell.exe", "-NoProfile", "-STA", "-ExecutionPolicy", "Bypass", "-Command", "[Console]::OutputEncoding=[Text.Encoding]::UTF8;"+script)
+	// скрипт передаётся в base64 (UTF-16LE): кавычки и кириллица в путях не ломают командную строку
+	full := "[Console]::OutputEncoding=[Text.Encoding]::UTF8;" + script
+	u := utf16.Encode([]rune(full))
+	b := make([]byte, len(u)*2)
+	for i, c := range u {
+		b[2*i], b[2*i+1] = byte(c), byte(c>>8)
+	}
+	cmd := exec.Command("powershell.exe", "-NoProfile", "-STA", "-ExecutionPolicy", "Bypass", "-EncodedCommand", base64.StdEncoding.EncodeToString(b))
 	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
 	out, err := cmd.Output()
 	return strings.TrimPrefix(string(out), "\ufeff"), err
@@ -91,8 +94,8 @@ func pickFiles(start, filter string, multi bool) ([]string, error) {
 	out, err := runPS("Add-Type -AssemblyName System.Windows.Forms;" +
 		"$d=New-Object System.Windows.Forms.OpenFileDialog;$d.Filter=" + psq(filter) + ";$d.Multiselect=" + m + ";$d.Title='Раскладчик — открыть';" +
 		"if(" + psq(start) + " -ne '' -and (Test-Path -LiteralPath " + psq(start) + ")){$d.InitialDirectory=" + psq(start) + "};" +
-		"$o=New-Object System.Windows.Forms.Form -Property @{TopMost=$true;ShowInTaskbar=$false};" +
-		"if($d.ShowDialog($o) -eq 'OK'){$d.FileNames | ForEach-Object { Write-Output $_ }}")
+		ownerPS +
+		"if($d.ShowDialog($o) -eq 'OK'){$d.FileNames | ForEach-Object { Write-Output $_ }};$o.Close()")
 	if err != nil {
 		return nil, err
 	}
@@ -109,8 +112,8 @@ func pickFiles(start, filter string, multi bool) ([]string, error) {
 func pickSaveFile(name, filter string) (string, error) {
 	out, err := runPS("Add-Type -AssemblyName System.Windows.Forms;" +
 		"$d=New-Object System.Windows.Forms.SaveFileDialog;$d.Filter=" + psq(filter) + ";$d.FileName=" + psq(name) + ";$d.OverwritePrompt=$true;$d.Title='Раскладчик — сохранить проект';" +
-		"$o=New-Object System.Windows.Forms.Form -Property @{TopMost=$true;ShowInTaskbar=$false};" +
-		"if($d.ShowDialog($o) -eq 'OK'){Write-Output $d.FileName}")
+		ownerPS +
+		"if($d.ShowDialog($o) -eq 'OK'){Write-Output $d.FileName};$o.Close()")
 	return strings.TrimSpace(out), err
 }
 
@@ -121,3 +124,8 @@ func configDir() string {
 	}
 	return filepath.Join(documentsDir(), "Раскладчик")
 }
+
+// невидимое окно-владелец поверх всех и вывод на передний план: иначе окно выбора открывается за окном программы
+const ownerPS = "$o=New-Object System.Windows.Forms.Form -Property @{TopMost=$true;ShowInTaskbar=$false;Opacity=0;FormBorderStyle='None';StartPosition='CenterScreen';Width=1;Height=1};$o.Show();" +
+	"Add-Type -Namespace RK -Name FG -MemberDefinition '[DllImport(\"user32.dll\")] public static extern bool SetForegroundWindow(IntPtr h); [DllImport(\"user32.dll\")] public static extern void keybd_event(byte b, byte s, uint f, UIntPtr e);';" +
+	"[RK.FG]::keybd_event(0x12,0,0,[UIntPtr]::Zero);[RK.FG]::keybd_event(0x12,0,2,[UIntPtr]::Zero);[void][RK.FG]::SetForegroundWindow($o.Handle);$o.Activate();$o.TopMost=$true;"
