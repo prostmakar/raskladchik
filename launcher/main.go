@@ -35,6 +35,7 @@ const title = "Раскладчик"
 
 type startFile struct {
 	Name string  `json:"name"`
+	Path string  `json:"path,omitempty"` // где лежит файл (проект помнит путь, чтобы открыть чертёж потом)
 	Text *string `json:"text,omitempty"`
 	B64  string  `json:"b64,omitempty"`
 	Err  string  `json:"err,omitempty"`
@@ -64,6 +65,9 @@ func findBrowser() (string, bool) {
 func readArgs() []startFile {
 	var files []startFile
 	for _, a := range os.Args[1:] {
+		if abs, err := filepath.Abs(a); err == nil {
+			a = abs
+		}
 		name := filepath.Base(a)
 		b, err := os.ReadFile(a)
 		if err != nil {
@@ -77,9 +81,9 @@ func readArgs() []startFile {
 				r[i] = rune(c)
 			}
 			t := string(r)
-			files = append(files, startFile{Name: name, Text: &t})
+			files = append(files, startFile{Name: name, Path: a, Text: &t})
 		} else {
-			files = append(files, startFile{Name: name, B64: base64.StdEncoding.EncodeToString(b)})
+			files = append(files, startFile{Name: name, Path: a, B64: base64.StdEncoding.EncodeToString(b)})
 		}
 	}
 	return files
@@ -306,8 +310,10 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		jsonOut(w, 200, map[string]string{"dir": d})
-	case "/api/hist/list", "/api/hist/save", "/api/hist/load", "/api/hist/delete", "/api/hist/open":
+	case "/api/hist/list", "/api/hist/save", "/api/hist/load", "/api/hist/delete", "/api/hist/open", "/api/hist/dir":
 		s.hist(w, r)
+	case "/api/openfiles", "/api/file", "/api/findfiles", "/api/proj/export", "/api/proj/import":
+		s.files(w, r)
 	case "/api/open":
 		if r.Method != http.MethodPost || !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
 			http.Error(w, "bad request", 400)

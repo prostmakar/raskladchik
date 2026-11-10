@@ -106,8 +106,8 @@
     }
     st.dirty = true; save(); render();
   }
-  function addBytes(name, bytes) {
-    const p = newPart(baseName(name), name);
+  function addBytes(name, bytes, path) {
+    const p = newPart(baseName(name), name); if (path) p.path = path;
     st.parts.push(p); raw.set(p.id, bytes); analyzePart(p);
     st.dirty = true; save();
     return p;
@@ -250,12 +250,19 @@
 
   // перетаскивание
   const drop = $('#sDrop'), inp = $('#sFile');
-  drop.addEventListener('click', () => inp.click());
-  drop.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); inp.click(); } });
+  // в exe — окно «Открыть» Windows (путь запоминается в проекте)
+  async function openNative() {
+    const list = await Paths.pick('dxf');
+    for (const f of list) { try { addBytes(f.name, await Paths.read(f.path), f.path); } catch (e) { const p = newPart(baseName(f.name), f.name); p.err = e.message; st.parts.push(p); } render(); await new Promise(r => setTimeout(r, 0)); }
+    st.dirty = true; save(); render();
+  }
+  const pickDxf = () => Paths.api ? openNative() : inp.click();
+  drop.addEventListener('click', pickDxf);
+  drop.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pickDxf(); } });
   inp.addEventListener('change', () => { const f = [...inp.files]; inp.value = ''; addFiles(f); });
   ['dragenter', 'dragover'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add('over'); }));
   ['dragleave', 'drop'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove('over'); }));
-  window.addEventListener('drop', e => { if (window.__mode !== 'sheet') return; e.preventDefault(); if ($('#sModal').hidden && e.dataTransfer && e.dataTransfer.files.length) { showTab('parts'); addFiles(e.dataTransfer.files); } });
+  window.addEventListener('drop', e => { if (window.__mode !== 'sheet') return; e.preventDefault(); if ($('#sModal').hidden && e.dataTransfer && e.dataTransfer.files.length) { showTab('parts'); const fs = [...e.dataTransfer.files]; addFiles(fs).then(() => window.askWhere && window.askWhere(fs)); } });
 
   // вкладки
   function showTab(t) { st.tab = t; $('#sTabParts').hidden = t !== 'parts'; $('#sTabNest').hidden = t !== 'nest'; document.querySelectorAll('#sTabs button').forEach(b => b.classList.toggle('on', b.dataset.t === t)); if (t === 'nest') renderNest(); }
@@ -742,10 +749,17 @@
       for (const f of startFiles) {
         if (f.err) { const p = newPart(f.name, f.name); p.err = f.err; st.parts.push(p); continue; }
         const b = atob(f.b64 || ''); const u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i);
-        addBytes(f.name, u);
+        addBytes(f.name, u, f.path);
       }
       st.dirty = true; save(); render();
     }
+    // проект открыт заново: исходные DXF — по запомненным путям (нужны для «Исправить» и если данные не сохранились)
+    if (Paths.api) (async () => {
+      let n = 0;
+      for (const p of st.parts) { if (!p.path || raw.has(p.id)) continue;
+        try { raw.set(p.id, await Paths.read(p.path)); if (p.lost || !p.an) { analyzePart(p); n++; } } catch (e) { if (p.lost) p.err = 'Чертёж не найден: ' + p.path; } }
+      if (n) { save(); render(); }
+    })();
   }
-  window.__sheet = { st, init, addFiles, addBytes, render, showTab, runNest, saveFixed, openView, openSheet, exportExcel, fixAll, metrics };
+  window.__sheet = { st, save, init, addFiles, addBytes, render, showTab, runNest, saveFixed, openView, openSheet, exportExcel, fixAll, metrics };
 })();

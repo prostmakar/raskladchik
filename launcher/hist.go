@@ -17,7 +17,37 @@ import (
 
 var idRx = regexp.MustCompile(`^[A-Za-z0-9_-]{4,64}$`)
 
-func histDir() string { return filepath.Join(documentsDir(), "Раскладчик", "История") }
+func defHistDir() string {
+	return filepath.Join(documentsDir(), "Раскладчик", "История")
+}
+
+// настройки: папка истории (можно общую на сервере)
+type config struct {
+	HistDir string `json:"histDir,omitempty"`
+}
+
+func loadConfig() config {
+	var c config
+	if b, err := os.ReadFile(filepath.Join(configDir(), "config.json")); err == nil {
+		json.Unmarshal(b, &c)
+	}
+	return c
+}
+
+func saveConfig(c config) error {
+	if err := os.MkdirAll(configDir(), 0o755); err != nil {
+		return err
+	}
+	b, _ := json.MarshalIndent(c, "", "  ")
+	return os.WriteFile(filepath.Join(configDir(), "config.json"), b, 0o644)
+}
+
+func histDir() string {
+	if d := loadConfig().HistDir; d != "" {
+		return d
+	}
+	return defHistDir()
+}
 
 func (s *server) hist(w http.ResponseWriter, r *http.Request) {
 	dir := histDir()
@@ -107,6 +137,29 @@ func (s *server) hist(w http.ResponseWriter, r *http.Request) {
 		os.Remove(filepath.Join(dir, req.ID+".json"))
 		os.Remove(filepath.Join(dir, req.ID+".meta.json"))
 		jsonOut(w, 200, map[string]bool{"ok": true})
+	case "/api/hist/dir": // GET — текущая папка истории; POST {dir} — сменить ("" — по умолчанию, в «Документах»)
+		if r.Method == http.MethodGet {
+			jsonOut(w, 200, map[string]string{"dir": dir, "def": defHistDir()})
+			return
+		}
+		if !post() {
+			return
+		}
+		var req struct{ Dir string }
+		json.NewDecoder(io.LimitReader(r.Body, 1<<16)).Decode(&req)
+		c := loadConfig()
+		c.HistDir = strings.TrimSpace(req.Dir)
+		if c.HistDir != "" {
+			if err := os.MkdirAll(c.HistDir, 0o755); err != nil {
+				jsonOut(w, 200, map[string]string{"error": "нет доступа к папке: " + err.Error()})
+				return
+			}
+		}
+		if err := saveConfig(c); err != nil {
+			jsonOut(w, 200, map[string]string{"error": err.Error()})
+			return
+		}
+		jsonOut(w, 200, map[string]string{"dir": histDir()})
 	case "/api/hist/open":
 		os.MkdirAll(dir, 0o755)
 		openFolder(dir)
