@@ -71,6 +71,9 @@ tr.need td{background:color-mix(in srgb, var(--warnbg) 55%, transparent)}
 .chip.off{text-decoration:line-through;opacity:.55}
 select,input[type=number],input[type=text]{font:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:6px 8px}
 input[type=number],input.nm{width:72px;text-align:right;font-family:var(--mono)}
+td input[type=number]{text-align:center;width:76px;padding:6px 4px;-moz-appearance:textfield;appearance:textfield}
+td input[type=number]::-webkit-inner-spin-button,td input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.dlg input[type=text],.dlg input[type=search],.hrow,.dlg{color:var(--ink)}
 .fld input.nm{width:84px}
 input:focus,select:focus{outline:2px solid color-mix(in srgb,var(--accent) 50%, transparent);outline-offset:0;border-color:var(--accent)}
 .big{font-size:16px;font-weight:700;color:var(--ink)}
@@ -149,7 +152,8 @@ tfoot td{border-bottom:0;background:var(--soft);font-weight:700}
 .st-title{font-size:30px;margin:0 0 6px}
 .st-title span{color:var(--accent)}
 .st-sub{color:var(--muted);margin:0 0 22px;font-size:16px}
-.nm.own{border-color:var(--accent);background:var(--accent-soft,#fff3ec)}
+.nm.own{border-color:var(--accent);background:color-mix(in srgb, var(--accent) 12%, var(--bg));color:var(--ink)}
+input::placeholder{color:var(--muted);opacity:.8}
 .endsk{margin:6px 0 4px}
 .endsvg{width:100%;height:auto;display:block;max-height:150px}
 .endsvg .ept2{cursor:pointer}.endsvg .ept2 circle+circle{fill:var(--card,#fff);stroke:var(--muted);stroke-width:2}
@@ -175,7 +179,7 @@ tfoot td{border-bottom:0;background:var(--soft);font-weight:700}
 .hrow .hd{grid-row:1/3;grid-column:2;color:var(--muted);font-size:13px;text-align:right;white-space:nowrap}
 .hrow.cur{background:color-mix(in srgb, var(--accent) 7%, transparent);border-radius:8px}
 .projbox{display:flex;align-items:center;gap:10px;justify-content:center;flex-wrap:wrap;margin:18px auto 0;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px 10px 16px;font-size:14px;color:var(--muted);max-width:980px}
-.projbox input{padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);font:inherit;min-width:0}
+.projbox input{padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit;min-width:0}
 .projbox .pn{width:240px}.projbox .pc{width:170px}
 .st-foot{margin-top:28px;display:flex;gap:12px;justify-content:center;align-items:center;flex-wrap:wrap;color:var(--muted);font-size:13px}
 .st-foot .new{color:var(--accent);font-weight:600}
@@ -439,7 +443,7 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
     </div>
     <div class="note">
       <b>x_t</b> — точный расчёт по 3D-модели: все контуры на наружной поверхности трубы. <b>PDF</b> — программа сама читает профиль, длину и отверстия с чертежа, проверьте и подтвердите. <b>TIF и «вручную»</b> — вводите размеры, глядя на чертёж: профиль, длину, углы торцов, отверстия, пазы.
-      «Врезка» — одна пробивка на каждый замкнутый контур. «Один торец» — для резки из хлыста, когда соседние детали разделяет общий рез. Каждый запуск программы начинается с пустого списка; прошлый список можно вернуть на стартовом экране.
+      «Врезка» — одна пробивка на каждый замкнутый контур. «Один торец» — для резки из хлыста, когда соседние детали разделяет общий рез. Каждый запуск программы начинается с пустого списка; прошлый проект — в «Истории проектов» на главном экране.
     </div>
   </section>
 
@@ -709,6 +713,14 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
 </script>
 <script>
 /*VIEW3D*/
+</script>
+<script>
+// числовые поля: щелчок выделяет всё значение — можно сразу печатать новое
+document.addEventListener('mousedown', e => {
+  const el = e.target; if (!(el instanceof HTMLInputElement) || document.activeElement === el) return;
+  if (el.type === 'number' || el.classList.contains('nm')) { e.preventDefault(); el.focus(); el.select(); }
+}, true);
+document.addEventListener('focusin', e => { const el = e.target; if (el instanceof HTMLInputElement && (el.type === 'number' || el.classList.contains('nm'))) setTimeout(() => { if (document.activeElement === el) el.select(); }, 0); });
 </script>
 <script>
 // ===== каждый запуск программы — с чистым списком; прошлый список можно вернуть со стартового экрана =====
