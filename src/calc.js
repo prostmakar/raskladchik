@@ -257,6 +257,7 @@
   // ---------- nesting with skew-aware placement ----------
   // pieces: [{key, name, g (shape)}]; returns same structure as nest() plus placements
   // kerf — расстояние между деталями; sharedKerf — ширина одного реза, когда соседние детали делят общий косой рез
+  const SHARED_MAX_GAP = 5;
   function nestShapes(pieces, S, kerf, trimStart, trimEnd, sharedKerf) {
     const sk = isFinite(sharedKerf) && sharedKerf >= 0 ? Math.min(sharedKerf, kerf) : Math.min(0.3, kerf);
     const end = S - trimEnd;
@@ -276,7 +277,8 @@
             const spread = Math.max(...diffs) - Math.min(...diffs);
             // общий рез: торцы совпадают по форме (скос, ступенька), а не просто прямые
             const flat = v => Math.max(...v) - Math.min(...v) < 0.05;
-            shared = spread < 0.05 && !(flat(last.o.ro) && Math.abs(last.o.angR - 90) <= 0.01);
+            // при большом заданном зазоре (больше обычного, > 5 мм) общий рез не делаем — зазор соблюдается всегда
+            shared = kerf <= SHARED_MAX_GAP && spread < 0.05 && !(flat(last.o.ro) && Math.abs(last.o.angR - 90) <= 0.01);
             const sinA = Math.sin(Math.min(last.o.angR, o.angL) * Math.PI / 180) || 1;
             const gap = shared ? sk / Math.max(0.3, sinA) : kerf;
             s = Math.max(...K.map(k => last.s + last.o.ro[k] + gap - o.lo[k]));

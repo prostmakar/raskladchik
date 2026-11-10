@@ -72,3 +72,52 @@ func pickFolder(start, prompt string) (string, error) {
 }
 
 func openFolder(d string) { exec.Command("explorer.exe", d).Start() }
+
+func runPS(script string) (string, error) {
+	cmd := exec.Command("powershell.exe", "-NoProfile", "-STA", "-ExecutionPolicy", "Bypass", "-Command", "[Console]::OutputEncoding=[Text.Encoding]::UTF8;"+script)
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
+	out, err := cmd.Output()
+	return strings.TrimPrefix(string(out), "\ufeff"), err
+}
+
+func psq(s string) string { return "'" + strings.ReplaceAll(s, "'", "''") + "'" }
+
+// окно «Открыть» Windows: полные пути выбранных файлов
+func pickFiles(start, filter string, multi bool) ([]string, error) {
+	m := "$false"
+	if multi {
+		m = "$true"
+	}
+	out, err := runPS("Add-Type -AssemblyName System.Windows.Forms;" +
+		"$d=New-Object System.Windows.Forms.OpenFileDialog;$d.Filter=" + psq(filter) + ";$d.Multiselect=" + m + ";$d.Title='Раскладчик — открыть';" +
+		"if(" + psq(start) + " -ne '' -and (Test-Path -LiteralPath " + psq(start) + ")){$d.InitialDirectory=" + psq(start) + "};" +
+		"$o=New-Object System.Windows.Forms.Form -Property @{TopMost=$true;ShowInTaskbar=$false};" +
+		"if($d.ShowDialog($o) -eq 'OK'){$d.FileNames | ForEach-Object { Write-Output $_ }}")
+	if err != nil {
+		return nil, err
+	}
+	var res []string
+	for _, l := range strings.Split(out, "\n") {
+		if l = strings.TrimSpace(l); l != "" {
+			res = append(res, l)
+		}
+	}
+	return res, nil
+}
+
+// окно «Сохранить как»
+func pickSaveFile(name, filter string) (string, error) {
+	out, err := runPS("Add-Type -AssemblyName System.Windows.Forms;" +
+		"$d=New-Object System.Windows.Forms.SaveFileDialog;$d.Filter=" + psq(filter) + ";$d.FileName=" + psq(name) + ";$d.OverwritePrompt=$true;$d.Title='Раскладчик — сохранить проект';" +
+		"$o=New-Object System.Windows.Forms.Form -Property @{TopMost=$true;ShowInTaskbar=$false};" +
+		"if($d.ShowDialog($o) -eq 'OK'){Write-Output $d.FileName}")
+	return strings.TrimSpace(out), err
+}
+
+// настройки программы: %APPDATA%\Раскладчик\config.json
+func configDir() string {
+	if d := os.Getenv("APPDATA"); d != "" {
+		return filepath.Join(d, "Раскладчик")
+	}
+	return filepath.Join(documentsDir(), "Раскладчик")
+}

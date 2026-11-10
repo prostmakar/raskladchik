@@ -187,7 +187,11 @@ input::placeholder{color:var(--muted);opacity:.8}
 .projbox input{padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit;min-width:0}
 .projbox .pn{width:240px}.projbox .pc{width:170px}
 .start{position:relative}
-.st-corner{position:absolute;top:16px;right:18px;display:flex;gap:10px;align-items:center}
+.st-corner{position:absolute;top:16px;right:18px;display:flex;gap:10px;align-items:center}.st-corner.left{right:auto;left:18px}
+.soon p{margin:0 0 12px;line-height:1.5}
+.wherebar{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:30;display:flex;gap:10px;align-items:center;background:var(--panel);color:var(--ink);border:1px solid var(--accent);border-radius:12px;padding:10px 12px 10px 16px;box-shadow:0 10px 30px rgba(0,0,0,.25);max-width:min(860px,94vw);font-size:14px}
+.projtag{font-size:15px;font-weight:500;color:var(--muted);margin-left:6px}
+.projbox{flex-direction:column;gap:8px}.projbox .pjrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:center}.projbox .pjl{font-weight:600;color:var(--ink)}
 .ibtn{width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:var(--panel);color:var(--ink);font:700 16px/1 Georgia,serif;font-style:italic;cursor:pointer}
 .ibtn:hover{border-color:var(--accent);color:var(--accent)}
 #themeSeg button.on{background:var(--ink);color:var(--panel)}
@@ -195,6 +199,7 @@ input::placeholder{color:var(--muted);opacity:.8}
 .nver .nh{display:flex;align-items:center;gap:10px;margin-bottom:6px}.nver .nh b{font-size:16px}
 .nver .nh .cur{color:var(--accent);font-size:13px;font-weight:600}
 .nver .nt{white-space:pre-wrap;font-size:14px;line-height:1.5;color:var(--ink)}
+.nsub{margin:6px 0 10px}.nsub .nst{font-weight:600;font-size:14px;margin-bottom:3px}.nsub .cur{color:var(--accent);font-weight:600}
 .st-foot{margin-top:28px;display:flex;gap:12px;justify-content:center;align-items:center;flex-wrap:wrap;color:var(--muted);font-size:13px}
 .st-foot .new{color:var(--accent);font-weight:600}
 .st-cards{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
@@ -396,6 +401,7 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
 <body>
 <!-- ===== START ===== -->
 <div class="start" id="start">
+  <div class="st-corner left"><button class="btn small soonbtn" id="soonBtn" title="Что в планах">⏳ Скоро</button></div>
   <div class="st-corner"><div class="seg sm" id="themeSeg" title="Оформление"><button data-th="auto">Авто</button><button data-th="light">☀ Светлая</button><button data-th="dark">☾ Тёмная</button></div><button class="ibtn" id="notesBtn" title="Что нового — все версии">i</button></div>
   <div class="start-in">
     <h1 class="st-title">Расклад<span>чик</span></h1>
@@ -417,13 +423,13 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
     <div class="prevbox" id="prevBox" hidden></div>
     <div class="projbox" id="projBox" hidden></div>
     <p class="st-hint">Можно сразу перетащить файлы сюда: DXF откроются в «Листе», x_t / IGES / STEP / PDF / TIF — в «Трубах».</p>
-    <div class="st-foot"><span>Раскладчик v__APP_VER__</span><span id="updMsg"></span><button class="btn" id="updBtn" hidden>Обновить</button><button class="btn" id="updPrev" hidden>Использовать предыдущую версию</button></div>
+    <div class="st-foot"><span>Раскладчик v__APP_VER__</span><span id="updMsg"></span><button class="btn" id="updBtn" hidden>Обновить</button><button class="btn" id="updPrev" hidden style="display:none">Использовать предыдущую версию</button></div>
   </div>
 </div>
 
 <div class="wrap" id="appTube" hidden>
   <header>
-    <h1><button class="home" data-go="home" title="К выбору: трубы или лист">←</button>Длина <span>реза</span> трубы</h1>
+    <h1><button class="home" data-go="home" title="К выбору: трубы или лист">←</button>Длина <span>реза</span> трубы <span class="projtag"></span></h1>
     <div class="modesw"><button data-go="tube" class="on">Трубы</button><button data-go="sheet">Лист</button><button data-go="pdf">PDF</button></div>
     <div class="tabs" id="tabs">
       <button data-t="parts" class="on">Детали<span class="cnt" id="cntParts"></span></button>
@@ -486,7 +492,7 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
 <!-- ===== SHEET APP ===== -->
 <div class="wrap" id="appSheet" hidden>
   <header>
-    <h1><button class="home" data-go="home" title="К выбору: трубы или лист">←</button>Лист: <span>проверка</span> и раскладка</h1>
+    <h1><button class="home" data-go="home" title="К выбору: трубы или лист">←</button>Лист: <span>проверка</span> и раскладка <span class="projtag"></span></h1>
     <div class="modesw"><button data-go="tube">Трубы</button><button data-go="sheet" class="on">Лист</button><button data-go="pdf">PDF</button></div>
     <div class="tabs" id="sTabs">
       <button data-t="parts" class="on">Детали<span class="cnt" id="sCnt"></span></button>
@@ -614,7 +620,17 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
 <div class="modal center" id="histm" hidden><div class="dlg wide">
   <div class="dlg-h"><h2>История проектов</h2><input type="search" id="histQ" placeholder="Поиск: название, заказчик, деталь…"><button class="ic" id="histClose">✕</button></div>
   <div class="dlg-b" id="histList"></div>
-  <div class="dlg-f"><span class="meta" id="histDir"></span><span class="spacer"></span><button class="btn" id="histFolder">Открыть папку истории</button></div>
+  <div class="dlg-f"><span class="meta" id="histDir"></span><span class="spacer"></span><button class="btn" id="histChange" title="Например, общая папка на сервере — тогда все менеджеры видят одни и те же проекты">Сменить папку…</button><button class="btn" id="histFolder">Открыть папку</button></div>
+</div></div>
+<div class="wherebar" id="whereBar" hidden></div>
+<div class="modal center" id="soonm" hidden><div class="dlg">
+  <div class="dlg-h"><h2>Скоро. Наверное.</h2><button class="ic" id="soonClose">✕</button></div>
+  <div class="dlg-b soon">
+    <p><b>Стоимость реза.</b> Программа посчитает, сколько стоит резать. Вы посмотрите на цифру и тихо закроете окно.</p>
+    <p><b>Коммерческое предложение.</b> КП в один клик. Заказчик всё равно попросит скидку, но уже на красивом бланке.</p>
+    <p><b>Выставление счёта.</b> Самая приятная часть. Единственная, которую ждут все, кроме заказчика.</p>
+    <p class="meta">Сроки: как у подрядчика — «на следующей неделе». Всё это приедет в версии 1.5.</p>
+  </div>
 </div></div>
 <div class="modal center" id="notesm" hidden><div class="dlg wide">
   <div class="dlg-h"><h2>Что нового — все версии</h2><span class="meta">сейчас установлена v__APP_VER__</span><button class="ic" id="notesClose">✕</button></div>
@@ -737,6 +753,22 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
 /*VIEW3D*/
 </script>
 <script>
+// ===== файлы по путям (в exe): окно «Открыть», чтение по сохранённому пути =====
+window.Paths = (function(){
+  const api = /^https?:$/.test(location.protocol);
+  const post = (u, b) => fetch(u, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(b)}).then(r=>r.json());
+  const last = k => { try{ return localStorage.getItem('open.dir.'+k)||''; }catch(e){ return ''; } };
+  const dirOf = p => p.replace(/[\\/][^\\/]*$/, '');
+  return {
+    api,
+    async read(path){ const r = await fetch('/api/file?path=' + encodeURIComponent(path)); if(!r.ok) throw new Error(r.status===404 ? 'файл не найден: ' + path : 'не удалось прочитать ' + path); return new Uint8Array(await r.arrayBuffer()); },
+    // окно «Открыть» Windows → [{name, path}]
+    async pick(kind){ const r = await post('/api/openfiles', {kind, start: last(kind)}); if(r.error){ alert(r.error); return []; } const ps = r.paths||[]; if(ps.length){ try{ localStorage.setItem('open.dir.'+kind, dirOf(ps[0])); }catch(e){} } return ps.map(p => ({ name: p.split(/[\\/]/).pop(), path: p })); },
+    dirOf,
+  };
+})();
+</script>
+<script>
 // числовые поля: щелчок выделяет всё значение — можно сразу печатать новое
 document.addEventListener('mousedown', e => {
   const el = e.target; if (!(el instanceof HTMLInputElement) || document.activeElement === el) return;
@@ -843,31 +875,31 @@ function readAs(f, kind){ return new Promise((res,rej)=>{ const r=new FileReader
 async function addFiles(list){
   for(const f of [...list]) await addOne(f.name, ()=>readAs(f,'text'), async()=>new Uint8Array(await readAs(f,'bin')));
 }
-async function addOne(name, getText, getBytes, preItems){
+async function addOne(name, getText, getBytes, preItems, path){
   const ext = (name.match(/\.([^.]+)$/)||[])[1]; const e = (ext||'').toLowerCase();
   if(e==='x_t' || e==='xmt_txt'){
-    const p = {id:nextId++, src:'xt', name:baseName(name), file:name, qty:1, mode:st.defMode, status:null, res:null, err:null};
+    const p = {id:nextId++, src:'xt', name:baseName(name), file:name, path:path||'', qty:1, mode:st.defMode, status:null, res:null, err:null};
     st.parts.push(p); render();
     try{ const t = await getText(); if(t.indexOf('PARASOLID')<0 && t.indexOf('TRANSMIT')<0) throw new Error('Это не текстовый x_t. Пересохраните модель как Parasolid (*.x_t), текстовый формат.'); p.res = XTCut.analyze(t); }
     catch(err){ p.err = (err&&err.message)||'Не удалось обработать файл'; }
     save(); render(); return;
   }
   if(e==='igs' || e==='iges'){
-    const p = {id:nextId++, src:'xt', fmt:'IGES', name:baseName(name), file:name, qty:1, mode:st.defMode, status:null, res:null, err:null};
+    const p = {id:nextId++, src:'xt', fmt:'IGES', name:baseName(name), file:name, path:path||'', qty:1, mode:st.defMode, status:null, res:null, err:null};
     st.parts.push(p); render(); await new Promise(r=>setTimeout(r,0));
     try{ const b = await getBytes(); p.res = XTCut.analyzeModel(IGES.toModel(b)); }
     catch(err){ p.err = (err&&err.message)||'Не удалось обработать IGES'; }
     save(); render(); return;
   }
   if(e==='stp' || e==='step'){
-    const p = {id:nextId++, src:'xt', fmt:'STEP', name:baseName(name), file:name, qty:1, mode:st.defMode, status:null, res:null, err:null};
+    const p = {id:nextId++, src:'xt', fmt:'STEP', name:baseName(name), file:name, path:path||'', qty:1, mode:st.defMode, status:null, res:null, err:null};
     st.parts.push(p); render(); await new Promise(r=>setTimeout(r,0));
     try{ const b = await getBytes(); p.res = XTCut.analyzeModel(STEP.toModel(b)); }
     catch(err){ p.err = (err&&err.message)||'Не удалось обработать STEP'; }
     save(); render(); return;
   }
   if(e==='pdf' || e==='tif' || e==='tiff'){
-    const p = newManual(e==='pdf'?'pdf':'tif', baseName(name), name);
+    const p = newManual(e==='pdf'?'pdf':'tif', baseName(name), name); p.path = path||'';
     st.parts.push(p); render();
     try{
       let bytes = await getBytes();
@@ -964,13 +996,19 @@ $('#btnTodo').addEventListener('click',()=>{ const p=st.parts.find(needs); if(p)
 
 // drop zone
 const drop=$('#drop'), inp=$('#file');
-drop.addEventListener('click',()=>inp.click());
-drop.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); inp.click(); } });
+async function openNative(){ // в exe — окно «Открыть» Windows: программа запомнит, откуда файлы
+  const list = await Paths.pick('tube');
+  for(const f of list){ let bytes=null; const gb = async()=>bytes||(bytes=await Paths.read(f.path));
+    await addOne(f.name, async()=>new TextDecoder('windows-1251').decode(await gb()), gb, undefined, f.path); }
+}
+const pickTube = () => Paths.api ? openNative() : inp.click();
+drop.addEventListener('click',pickTube);
+drop.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); pickTube(); } });
 inp.addEventListener('change',()=>{ const f=[...inp.files]; inp.value=''; addFiles(f); });
 ['dragenter','dragover'].forEach(t=>drop.addEventListener(t,e=>{ e.preventDefault(); drop.classList.add('over'); }));
 ['dragleave','drop'].forEach(t=>drop.addEventListener(t,e=>{ e.preventDefault(); drop.classList.remove('over'); }));
 window.addEventListener('dragover',e=>e.preventDefault());
-window.addEventListener('drop',e=>{ e.preventDefault(); if(window.__mode!=='tube') return; if($('#modal').hidden && e.dataTransfer && e.dataTransfer.files.length){ showTab('parts'); addFiles(e.dataTransfer.files); } });
+window.addEventListener('drop',e=>{ e.preventDefault(); if(window.__mode!=='tube') return; if($('#modal').hidden && e.dataTransfer && e.dataTransfer.files.length){ showTab('parts'); const fs=[...e.dataTransfer.files]; addFiles(fs).then(()=>window.askWhere&&window.askWhere(fs)); } });
 
 // tabs
 function showTab(t){ st.tab=t; $('#tabParts').hidden = t!=='parts'; $('#tabNest').hidden = t!=='nest'; document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on', b.dataset.t===t)); if(t==='nest') renderNest(); }
@@ -1220,9 +1258,10 @@ function updateRes(showMiss){
 // viewer
 const viewer=$('#viewer'), cv=$('#cv');
 async function loadPreview(){
-  const pv = previews.get(ed.id);
+  let pv = previews.get(ed.id);
+  if(!pv){ const p0=byId(ed.id); if(p0 && p0.path && Paths.api){ $('#vmsg').hidden=false; $('#vmsg').textContent='Открываю чертёж: '+p0.path; try{ let b=await Paths.read(p0.path); if(!/\.pdf$/i.test(p0.path)) b=Media.tiffToPdf(b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength)); previews.set(p0.id,{bytes:b}); pv=previews.get(ed.id); }catch(err){ $('#vmsg').textContent='Чертёж не открылся: '+err.message+'. Если файл переместили — перетащите его снова.'; return; } } }
   $('#vmsg').hidden=true; cv.hidden=true; $('#vPrev').hidden=$('#vNext').hidden=true; $('#vPage').textContent='';
-  if(!pv){ const p=byId(ed.id); $('#vmsg').hidden=false; $('#vmsg').textContent = p.src==='man' ? 'Деталь без чертежа — вводите размеры справа.' : 'Чертёж не сохраняется между запусками. Перетащите файл в программу снова, чтобы видеть его здесь.'; return; }
+  if(!pv){ const p=byId(ed.id); $('#vmsg').hidden=false; $('#vmsg').textContent = p.src==='man' ? 'Деталь без чертежа — вводите размеры справа.' : (p.path ? 'Чертёж не найден: '+p.path : 'Программа не знает, откуда этот файл (его перетащили). Перетащите его снова или добавляйте файлы кнопкой — тогда путь запомнится.'); return; }
   try{
     if(!pv.doc) pv.doc = await openPdf(pv.bytes);
     await drawPage();
@@ -1529,12 +1568,12 @@ function nestSheets(){
 // ---------- startup files from the .exe ----------
 (async()=>{
   render();
-  const tubeFiles = (window.__STARTUP||[]).filter(f=>!/\.dxf$/i.test(f.name));
+  const tubeFiles = (window.__STARTUP||[]).filter(f=>!/\.(dxf|raskl)$/i.test(f.name));
   if(tubeFiles.length){
     for(const f of tubeFiles){
       if(f.err){ st.parts.push({id:nextId++, src:'man', name:baseName(f.name), err:f.err, status:'fill', qty:1, mode:st.defMode, prof:{type:'rect'}, ends:[], holes:[], slots:[]}); continue; }
       const bytes = () => { const b=atob(f.b64||''); const u=new Uint8Array(b.length); for(let i=0;i<b.length;i++) u[i]=b.charCodeAt(i); return u; };
-      await addOne(f.name, async()=> f.text!==undefined ? f.text : new TextDecoder('windows-1251').decode(bytes()), async()=>bytes());
+      await addOne(f.name, async()=> f.text!==undefined ? f.text : new TextDecoder('windows-1251').decode(bytes()), async()=>bytes(), undefined, f.path);
     }
     render();
   }
@@ -1558,6 +1597,7 @@ window.__pdf = { lib: pdfLib, open: openPdf };
     window.__mode = mode;
     $('#start').hidden = mode!=='home';
     if(mode==='home' && window.__proj){ window.__proj.save(); window.__proj.box(); }
+    if(window.__proj && window.__proj.tag) window.__proj.tag();
     $('#appTube').hidden = mode!=='tube';
     $('#appSheet').hidden = mode!=='sheet';
     $('#appPdf').hidden = mode!=='pdf';
@@ -1574,8 +1614,10 @@ window.__pdf = { lib: pdfLib, open: openPdf };
     if(window.__mode!=='home') return; e.preventDefault();
     const fs=[...(e.dataTransfer&&e.dataTransfer.files||[])]; if(!fs.length) return;
     const d=fs.filter(f=>isDxf(f.name)), t=fs.filter(f=>!isDxf(f.name));
-    if(t.length){ go('tube'); window.__app.showTab('parts'); window.__app.addFiles ? window.__app.addFiles(t) : null; }
-    if(d.length){ go('sheet'); window.__sheet.addFiles(d); }
+    const ps = [];
+    if(t.length){ go('tube'); window.__app.showTab('parts'); ps.push(window.__app.addFiles(t)); }
+    if(d.length){ go('sheet'); ps.push(window.__sheet.addFiles(d)); }
+    Promise.all(ps).then(()=>window.askWhere && window.askWhere(fs));
   });
   // пока окно открыто, программа (exe) не закрывается
   if(/^https?:$/.test(location.protocol)){
@@ -1646,7 +1688,10 @@ window.__pdf = { lib: pdfLib, open: openPdf };
     const d = await fetch('/api/hist/load?id=' + encodeURIComponent(id)).then(r=>r.ok?r.json():null).catch(()=>null);
     if(!d){ alert('Не удалось открыть проект'); return; }
     const meta = (await fetch('/api/hist/list').then(r=>r.json()).catch(()=>({items:[]}))).items.find(m=>m.id===id) || {id};
-    const keep = {id: meta.id, name: meta.name || '', auto: !!meta.auto, customer: meta.customer||'', comment: meta.comment||'', created: meta.created || Date.now()};
+    applyProject(d, meta);
+  }
+  function applyProject(d, meta){
+    const keep = {id: meta.id || newId(), name: meta.name || '', auto: !!meta.auto, customer: meta.customer||'', comment: meta.comment||'', created: meta.created || Date.now()};
     try{
       localStorage.setItem('xtcut.v2', JSON.stringify(d.tube || {parts:[]}));
       localStorage.setItem('sheet.v1', JSON.stringify(d.sheet || {parts:[]}));
@@ -1666,20 +1711,53 @@ window.__pdf = { lib: pdfLib, open: openPdf };
     const meta = J('proj.cur'); const info = projInfo(J('xtcut.v2'), J('sheet.v1'));
     el.hidden = false;
     const has = info.tubes || info.sheets;
-    el.innerHTML = (has ? `<span>Текущий проект:</span><input class="pn" id="pjName" placeholder="Название" value="${(meta&&meta.name||'').replace(/"/g,'&quot;')}"><input class="pc" id="pjCust" placeholder="Заказчик" value="${(meta&&meta.customer||'').replace(/"/g,'&quot;')}"><button class="btn small" id="pjNew" title="Текущий останется в истории">Новый проект</button>` : '<span>Новый проект — добавьте файлы</span>')
-      + `<button class="btn small" id="pjHist">История проектов</button>`;
-    const upd = () => { let m = J('proj.cur'); if(!m){ saveProj(true).then(()=>{ m=J('proj.cur'); if(m){ m.name=$('#pjName').value; m.customer=$('#pjCust').value; m.auto=false; localStorage.setItem('proj.cur', JSON.stringify(m)); saveProj(true); } }); return; }
-      m.name = $('#pjName').value; m.customer = $('#pjCust').value; m.auto = false; localStorage.setItem('proj.cur', JSON.stringify(m)); saveProj(true); };
-    if(has){ $('#pjName').onchange = upd; $('#pjCust').onchange = upd; $('#pjNew').onclick = () => { if(confirm('Начать новый проект? Текущий сохранится в истории.')) newProj(); }; }
+    const q = t => String(t||'').replace(/"/g,'&quot;');
+    el.innerHTML = `<div class="pjrow">${has
+        ? `<span class="pjl">Проект:</span><input class="pn" id="pjName" placeholder="Название проекта" value="${q(meta&&meta.name)}"><input class="pc" id="pjCust" placeholder="Заказчик" value="${q(meta&&meta.customer)}"><span class="meta">${info.tubes?'трубы '+info.tubes:''}${info.tubes&&info.sheets?' · ':''}${info.sheets?'лист '+info.sheets:''} дет. · сохраняется само</span>`
+        : `<span class="pjl">Новый проект</span><span class="meta">добавьте файлы в «Трубы» или «Лист» — проект сохранится сам</span>`}</div>
+      <div class="pjrow btns"><button class="btn small" id="pjNew"${has?'':' disabled'}>＋ Новый проект</button><button class="btn small" id="pjHist">🗂 История проектов</button><button class="btn small" id="pjOpen">📂 Открыть проект из файла…</button><button class="btn small" id="pjExport"${has?'':' disabled'}>💾 Сохранить проект в файл…</button></div>`;
+    const upd = () => { let m = J('proj.cur'); const go2 = m2 => { m2.name=$('#pjName').value; m2.customer=$('#pjCust').value; m2.auto=false; localStorage.setItem('proj.cur', JSON.stringify(m2)); saveProj(true); projTag(); };
+      if(!m){ saveProj(true).then(()=>{ const m2=J('proj.cur'); if(m2) go2(m2); }); return; } go2(m); };
+    if(has){ $('#pjName').onchange = upd; $('#pjCust').onchange = upd; }
+    $('#pjNew').onclick = () => { if(confirm('Начать новый проект? Текущий уже сохранён в истории — его можно открыть оттуда.')) newProj(); };
     $('#pjHist').onclick = openHist;
+    $('#pjOpen').onclick = importProj;
+    $('#pjExport').onclick = exportProj;
   }
+  function projTag(){ const m = J('proj.cur'); document.querySelectorAll('.projtag').forEach(e => { e.textContent = m && m.name ? '· ' + m.name : ''; e.title = m && m.customer ? 'Заказчик: ' + m.customer : ''; }); }
+  // проект одним файлом (.raskl): передать другому менеджеру. Чертежи — по путям на сервере, внутри файла их нет
+  async function exportProj(){
+    await saveProj(true);
+    const m = J('proj.cur') || {}; const tr = localStorage.getItem('xtcut.v2'), sr = localStorage.getItem('sheet.v1');
+    const info = projInfo(JSON.parse(tr||'null'), JSON.parse(sr||'null'));
+    const body = '{"name":' + JSON.stringify(m.name || 'Проект') + ',"data":{"raskl":1,"app":"__APP_VER__","meta":' + JSON.stringify(Object.assign({}, m, info, {updated: Date.now()})) + ',"tube":' + (tr||'null') + ',"sheet":' + (sr||'null') + '}}';
+    const r = await fetch('/api/proj/export', {method:'POST', headers:{'Content-Type':'application/json'}, body}).then(r=>r.json()).catch(e=>({error:e.message}));
+    if(r.error) alert('Не сохранилось: ' + r.error); else if(r.path) alert('Проект сохранён:\n' + r.path + '\n\nЧертежи в файл не кладутся — у коллеги они откроются по тем же путям на сервере.');
+  }
+  async function importProj(path){
+    if(typeof path !== 'string'){ const ps = await Paths.pick('raskl'); if(!ps.length) return; path = ps[0].path; }
+    const d = await fetch('/api/proj/import?path=' + encodeURIComponent(path)).then(r=>r.ok?r.json():null).catch(()=>null);
+    if(!d || !d.raskl){ alert('Это не проект Раскладчика: ' + path); return; }
+    const ti = projInfo(J('xtcut.v2'), J('sheet.v1'));
+    if((ti.tubes||ti.sheets) && !confirm('Открыть проект «' + ((d.meta&&d.meta.name)||'') + '»? Текущий сохранён в истории.')) return;
+    await saveProj(true);
+    const meta = Object.assign({}, d.meta || {}); // тот же id: у всех один и тот же проект
+    applyProjectSaved(d, meta);
+  }
+  async function applyProjectSaved(d, meta){ // открыть и сразу положить в историю
+    if(!meta.id) meta.id = newId();
+    const data = '{"v":1,"tube":' + JSON.stringify(d.tube||{parts:[]}) + ',"sheet":' + JSON.stringify(d.sheet||{parts:[]}) + '}';
+    await fetch('/api/hist/save', {method:'POST', headers:{'Content-Type':'application/json'}, body: '{"id":' + JSON.stringify(meta.id) + ',"meta":' + JSON.stringify(Object.assign({}, meta, projInfo(d.tube, d.sheet), {updated: Date.now()})) + ',"data":' + data + '}'}).catch(()=>{});
+    applyProject(d, meta);
+  }
+  window.__openProjFile = importProj;
   let histItems = [];
   async function openHist(){
     await saveProj(true);
     $('#histm').hidden = false; $('#histList').innerHTML = '<div class="meta">Загружаю…</div>';
     const r = await fetch('/api/hist/list').then(r=>r.json()).catch(()=>null);
     if(!r){ $('#histList').innerHTML = '<div class="miss">Не удалось прочитать историю</div>'; return; }
-    histItems = r.items || []; $('#histDir').textContent = r.dir || ''; drawHist();
+    histItems = r.items || []; $('#histDir').textContent = 'Папка: ' + (r.dir || ''); drawHist();
     $('#histQ').focus();
   }
   function drawHist(){
@@ -1697,6 +1775,13 @@ window.__pdf = { lib: pdfLib, open: openPdf };
     $('#histClose').onclick = () => { $('#histm').hidden = true; };
     $('#histm').addEventListener('click', e => { if(e.target.id==='histm') $('#histm').hidden = true; });
     $('#histFolder').onclick = () => fetch('/api/hist/open');
+    $('#histChange').onclick = async () => {
+      const cur = await fetch('/api/hist/dir').then(r=>r.json()).catch(()=>({}));
+      const r = await post('/api/pickdir', {start: cur.dir, prompt: 'Папка истории проектов (можно общую на сервере)'});
+      if(r.error){ alert(r.error); return; } if(!r.dir) return;
+      const s2 = await post('/api/hist/dir', {dir: r.dir}); if(s2.error){ alert(s2.error); return; }
+      lastSaved = ''; await saveProj(true); openHist();
+    };
     $('#histList').addEventListener('click', async e => {
       const o = e.target.closest('[data-hopen]'); if(o){ const ti=projInfo(J('xtcut.v2'),J('sheet.v1')); if((ti.tubes||ti.sheets) && !confirm('Открыть этот проект? Текущий сохранён в истории.')) return; openProj(o.dataset.hopen); return; }
       const d = e.target.closest('[data-hdel]'); if(d){ const m = histItems.find(x=>x.id===d.dataset.hdel); if(!confirm('Удалить из истории «'+(m&&m.name||'')+'»? Сами файлы чертежей не удаляются.')) return;
@@ -1708,7 +1793,33 @@ window.__pdf = { lib: pdfLib, open: openPdf };
     $('#prevBox').hidden = true;
   } else prevInfo();
   projBox();
-  window.__proj = { save: saveProj, info: () => J('proj.cur'), box: projBox };
+  window.__proj = { save: saveProj, info: () => J('proj.cur'), box: projBox, tag: projTag };
+  projTag();
+
+  // ----- перетащили файлы: Windows не говорит программе, откуда они — спросим папку и найдём их там -----
+  window.askWhere = function(files){
+    if(!API || !files || !files.length) return;
+    const names = new Set(files.map(f=>f.name.toLowerCase()));
+    const T = window.__app && window.__app.st, Sh = window.__sheet && window.__sheet.st;
+    const need = [...(T?T.parts:[]), ...(Sh?Sh.parts:[])].filter(p => !p.path && p.file && names.has(p.file.toLowerCase()));
+    if(!need.length) return;
+    const bar = $('#whereBar');
+    bar.innerHTML = `<span>Чтобы проект помнил чертежи, укажите папку, откуда перетащили файлы (${need.length}). Windows программе этого не говорит — секретничает.</span><button class="btn small primary" id="whereOk">Указать папку…</button><button class="ic" id="whereNo" title="Не сейчас">✕</button>`;
+    bar.hidden = false;
+    $('#whereNo').onclick = () => { bar.hidden = true; };
+    $('#whereOk').onclick = async () => {
+      let start = ''; try{ start = localStorage.getItem('where.dir')||''; }catch(e){}
+      const r = await post('/api/pickdir', {start, prompt: 'Папка, откуда перетащили файлы (подпапки тоже проверю)'});
+      if(r.error){ alert(r.error); return; } if(!r.dir) return;
+      try{ localStorage.setItem('where.dir', r.dir); }catch(e){}
+      const f = await post('/api/findfiles', {dir: r.dir, files: files.map(x=>({name:x.name, size:x.size}))});
+      const found = f.found || {}; let n = 0;
+      for(const p of need){ const path = found[p.file.toLowerCase()]; if(path){ p.path = path; n++; } }
+      if(T) window.__app.save(); if(Sh) window.__sheet.save();
+      bar.innerHTML = `<span>${n===need.length ? 'Готово: все ' + n + ' путей запомнены.' : 'Нашёл ' + n + ' из ' + need.length + '. Остальные, видимо, ушли в другую папку — без записки.'}</span><button class="ic" id="whereNo2">✕</button>`;
+      $('#whereNo2').onclick = () => { bar.hidden = true; }; setTimeout(()=>{ bar.hidden = true; }, 6000);
+    };
+  };
 
   // ----- тема: авто / светлая / тёмная -----
   function setTheme(t){ if(t==='light'||t==='dark') document.documentElement.dataset.theme=t; else delete document.documentElement.dataset.theme;
@@ -1722,12 +1833,18 @@ window.__pdf = { lib: pdfLib, open: openPdf };
   const vcmp = (a,b) => { const x=a.split('.').map(Number), y=b.split('.').map(Number); for(let i=0;i<Math.max(x.length,y.length);i++){ const d=(x[i]||0)-(y[i]||0); if(d) return d; } return 0; };
   function drawNotes(){
     const esc2 = t => String(t).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-    $('#notesList').innerHTML = NOTES.map(n => { const rel = vcmp(n.ver,'1.1')>=0 && REPO; const cur = n.ver===CUR;
-      return `<div class="nver"><div class="nh"><b>v${esc2(n.ver)}</b>${cur?'<span class="cur">установлена сейчас</span>':''}<span class="spacer"></span>
-        ${rel?`<a class="btn small" href="https://github.com/${REPO}/releases/download/v${n.ver}/Raskladchik_v${n.ver}.zip" title="Скачать архив этой версии">Скачать</a>`:''}
-        ${rel&&!cur&&API?`<button class="btn small${vcmp(n.ver,CUR)>0?' primary':''}" data-inst="${esc2(n.ver)}">Установить</button>`:''}</div>
-        <div class="nt">${esc2(n.text.replace(/^.*\n+/, ''))}</div></div>`; }).join('');
+    // по версиям «1.4»: исправления 1.4.1, 1.4.2 — внутри; скачать/установить — последнюю сборку версии (со всеми исправлениями)
+    const groups = new Map();
+    for(const n of NOTES){ const k = n.ver.split('.').slice(0,2).join('.'); if(!groups.has(k)) groups.set(k, []); groups.get(k).push(n); }
+    $('#notesList').innerHTML = [...groups].map(([k, list]) => { const top = list[0].ver; const rel = vcmp(top,'1.1')>=0 && REPO; const has = list.some(n=>n.ver===CUR);
+      const body = list.map(n => { const lines = n.text.split('\n'); return `<div class="nsub"><div class="nst">${esc2(lines[0].replace(/^#+\s*/,''))}${n.ver===CUR?' <span class="cur">— у вас сейчас</span>':''}</div><div class="nt">${esc2(lines.slice(1).join('\n').trim())}</div></div>`; }).join('');
+      return `<div class="nver"><div class="nh"><b>v${esc2(k)}</b>${list.length>1?`<span class="meta">последняя сборка v${esc2(top)}</span>`:''}${has?'<span class="cur">установлена</span>':''}<span class="spacer"></span>
+        ${rel?`<a class="btn small" href="https://github.com/${REPO}/releases/download/v${top}/Raskladchik_v${top}.zip" title="Скачать архив v${top}">Скачать</a>`:''}
+        ${rel&&top!==CUR&&API?`<button class="btn small${vcmp(top,CUR)>0?' primary':''}" data-inst="${esc2(top)}">${vcmp(top,CUR)>0?'Обновить до v'+esc2(top):'Установить v'+esc2(top)}</button>`:''}</div>${body}</div>`; }).join('');
   }
+  $('#soonBtn').onclick = () => { $('#soonm').hidden = false; };
+  $('#soonClose').onclick = () => { $('#soonm').hidden = true; };
+  $('#soonm').addEventListener('click', e => { if(e.target.id==='soonm') $('#soonm').hidden = true; });
   $('#notesBtn').onclick = () => { drawNotes(); $('#notesMsg').textContent=''; $('#notesm').hidden=false; };
   $('#notesClose').onclick = () => { $('#notesm').hidden=true; };
   $('#notesm').addEventListener('click', async e => {
@@ -1780,7 +1897,7 @@ window.__pdf = { lib: pdfLib, open: openPdf };
       }catch(e){ msg.textContent='Ошибка: '+e.message; btn.disabled = pb.disabled = false; }
     };
     pb.onclick = () => { if(!info||!info.prev) return; if(!confirm('Вернуться на предыдущую версию v'+info.prev+'?\n\nПригодится, если в новой что-то сломалось. Списки сохранятся. Позже можно снова обновиться кнопкой «Обновить».')) return; restartTo('/api/update/prev', info.prev, 'Предыдущая версия'); };
-    const setInfo = r => { info=r; pb.hidden = !(r && r.prev); if(r && r.prev) pb.textContent='Использовать предыдущую версию (v'+r.prev+')';
+    const setInfo = r => { info=r; pb.hidden = true; // откат — в окне «i» (кнопка «Установить» у нужной версии)
       if(r.err){ msg.textContent=''; msg.className=''; btn.textContent='Проверить обновления'; btn.title=r.err; btn.classList.remove('primary'); return; }
       if(r.newer){ msg.textContent='Доступна v'+r.latest; msg.className='new'; btn.textContent='Обновить до v'+r.latest; btn.classList.add('primary'); }
       else { msg.textContent='последняя версия'; msg.className=''; btn.textContent='Проверить обновления'; btn.classList.remove('primary'); }
@@ -1793,7 +1910,10 @@ window.__pdf = { lib: pdfLib, open: openPdf };
       restartTo('/api/update/apply', info.latest, 'Новая версия');
     };
   })();
-  const sf = window.__STARTUP||[];
+  const sfAll = window.__STARTUP||[];
+  const rk = sfAll.find(f=>/\.raskl$/i.test(f.name) && f.path);
+  if(rk && window.__openProjFile) setTimeout(()=>window.__openProjFile(rk.path), 300); // двойной щелчок по файлу проекта
+  const sf = sfAll.filter(f=>!/\.raskl$/i.test(f.name));
   const dx = sf.filter(f=>isDxf(f.name)), tb = sf.filter(f=>!isDxf(f.name));
   window.__sheet.init(dx);
   go(dx.length ? 'sheet' : tb.length ? 'tube' : 'home');
