@@ -1,0 +1,34 @@
+# Выпуск версии: git tag v1.2 && git push origin v1.2
+# Собирает Раскладчик.exe и публикует релиз (описание — notes/<тег>.md).
+name: release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: launcher/go.mod
+      - name: Версия совпадает с тегом
+        run: test "v$(cat VERSION | tr -d '[:space:]')" = "${GITHUB_REF_NAME}"
+      - name: Тесты
+        run: |
+          node tests/test_calc.js
+          node tests/test_dxf.js
+      - name: Сборка
+        run: python3 build.py
+      - name: Релиз
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "rel/Раскладчик"
+          cp "dist/Раскладчик.exe" "Как пользоваться.txt" "rel/Раскладчик/"
+          (cd rel && zip -qr "../Raskladchik_${GITHUB_REF_NAME}.zip" "Раскладчик")
+          cp "dist/Раскладчик.exe" Raskladchik.exe
+          NOTES="notes/${GITHUB_REF_NAME}.md"; [ -f "$NOTES" ] || echo "Раскладчик ${GITHUB_REF_NAME}" > "$NOTES"
+          gh release create "${GITHUB_REF_NAME}" --title "Раскладчик ${GITHUB_REF_NAME}" --notes-file "$NOTES" Raskladchik.exe "Raskladchik_${GITHUB_REF_NAME}.zip"
