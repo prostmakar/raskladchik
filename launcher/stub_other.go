@@ -18,3 +18,15 @@ func desktopDir() string {
 	h, _ := os.UserHomeDir()
 	return filepath.Join(h, "Desktop")
 }
+
+func documentsDir() string {
+	if d := os.Getenv("DOCUMENTS_DIR"); d != "" {
+		return d
+	}
+	h, _ := os.UserHomeDir()
+	return filepath.Join(h, "Documents")
+}
+
+func pickFolder(start, prompt string) (string, error) { return os.Getenv("PICK_DIR"), nil }
+
+func openFolder(d string) {}

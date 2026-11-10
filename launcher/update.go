@@ -20,6 +20,14 @@ import (
 // "владелец/репозиторий" на GitHub (подставляет build.py из release.json)
 var repo = ""
 
+// адрес API GitHub (переменная окружения — только для проверки обновления на тестовом сервере)
+func apiBase() string {
+	if b := os.Getenv("RASKLADCHIK_TEST_API"); b != "" {
+		return b
+	}
+	return "https://api.github.com"
+}
+
 type release struct {
 	Tag    string `json:"tag_name"`
 	Name   string `json:"name"`
@@ -65,12 +73,56 @@ func newer(a, b string) bool { // a новее b
 	return false
 }
 
+func ghGet(path string, v any) error {
+	if repo == "" {
+		return errors.New("адрес обновлений не настроен")
+	}
+	c := &http.Client{Timeout: 15 * time.Second}
+	req, _ := http.NewRequest("GET", apiBase()+"/repos/"+repo+path, nil)
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("User-Agent", "Raskladchik-updater")
+	resp, err := c.Do(req)
+	if err != nil {
+		return errors.New("нет связи с GitHub")
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == 404 {
+		return errors.New("на GitHub пока нет версий")
+	}
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("GitHub ответил %d", resp.StatusCode)
+	}
+	return json.NewDecoder(io.LimitReader(resp.Body, 8<<20)).Decode(v)
+}
+
+// предыдущая версия: самая новая из тех, что старше текущей (с exe)
+func prevRelease() (*release, error) {
+	var all []release
+	if err := ghGet("/releases?per_page=50", &all); err != nil {
+		return nil, err
+	}
+	var best *release
+	for i := range all {
+		r := &all[i]
+		if u, _ := r.exeAsset(); u == "" || !newer(version, r.Tag) {
+			continue
+		}
+		if best == nil || newer(r.Tag, best.Tag) {
+			best = r
+		}
+	}
+	if best == nil {
+		return nil, errors.New("предыдущей версии на GitHub нет")
+	}
+	return best, nil
+}
+
 func latestRelease() (*release, error) {
 	if repo == "" {
 		return nil, errors.New("адрес обновлений не настроен")
 	}
 	c := &http.Client{Timeout: 15 * time.Second}
-	req, _ := http.NewRequest("GET", "https://api.github.com/repos/"+repo+"/releases/latest", nil)
+	req, _ := http.NewRequest("GET", apiBase()+"/repos/"+repo+"/releases/latest", nil)
 	req.Header.Set("Accept", "application/vnd.github+json")
 	req.Header.Set("User-Agent", "Raskladchik-updater")
 	resp, err := c.Do(req)
@@ -104,6 +156,7 @@ type checkResult struct {
 	Current string `json:"current"`
 	Latest  string `json:"latest,omitempty"`
 	Newer   bool   `json:"newer"`
+	Prev    string `json:"prev,omitempty"`
 	Notes   string `json:"notes,omitempty"`
 	Err     string `json:"err,omitempty"`
 }
@@ -119,6 +172,9 @@ func checkUpdate() checkResult {
 	res.Notes = r.Body
 	u, _ := r.exeAsset()
 	res.Newer = newer(r.Tag, version) && u != ""
+	if p, err := prevRelease(); err == nil {
+		res.Prev = strings.TrimPrefix(p.Tag, "v")
+	}
 	return res
 }
 
@@ -131,16 +187,26 @@ func applyUpdate() error {
 	if !newer(r.Tag, version) {
 		return errors.New("уже последняя версия")
 	}
+	return install(r)
+}
+
+// вернуться на предыдущую версию (последнюю из тех, что старше текущей)
+func applyPrev() (string, error) {
+	r, err := prevRelease()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimPrefix(r.Tag, "v"), install(r)
+}
+
+func install(r *release) error {
 	u, size := r.exeAsset()
 	if u == "" {
 		return errors.New("в версии на GitHub нет exe")
 	}
-	self, err := os.Executable()
-	if err != nil {
-		return err
-	}
-	if p, e := filepath.EvalSymlinks(self); e == nil {
-		self = p
+	self := selfPath
+	if self == "" {
+		return errors.New("не удалось определить, где лежит программа")
 	}
 	dir := filepath.Dir(self)
 	tmp := filepath.Join(dir, ".raskladchik-new.exe")
@@ -155,7 +221,7 @@ func applyUpdate() error {
 	if resp.StatusCode != 200 {
 		return fmt.Errorf("не удалось скачать: GitHub ответил %d", resp.StatusCode)
 	}
-	f, err := os.Create(tmp)
+	f, err := os.OpenFile(tmp, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o755)
 	if err != nil {
 		return errors.New("нет прав на запись в папку программы: " + dir)
 	}
@@ -165,7 +231,7 @@ func applyUpdate() error {
 		os.Remove(tmp)
 		return errors.New("файл скачался не полностью, попробуйте ещё раз")
 	}
-	if b, _ := os.ReadFile(tmp); len(b) < 2 || b[0] != 'M' || b[1] != 'Z' {
+	if b, _ := os.ReadFile(tmp); os.Getenv("RASKLADCHIK_TEST_API") == "" && (len(b) < 2 || b[0] != 'M' || b[1] != 'Z') {
 		os.Remove(tmp)
 		return errors.New("скачанный файл — не программа")
 	}
@@ -181,15 +247,24 @@ func applyUpdate() error {
 	}
 	cmd := exec.Command(self, "--after-update")
 	cmd.Dir = dir
-	if err := cmd.Start(); err != nil {
+	if err := cmd.Start(); err != nil { // вернуть как было
+		os.Remove(self)
+		os.Rename(old, self)
 		return errors.New("новая версия не запустилась: " + err.Error())
 	}
 	return nil
 }
 
+// путь к своему exe — запоминается при запуске (после переименования при обновлении он уже другой)
+var selfPath string
+
 // остаток прошлого обновления
 func cleanupOld() {
 	if self, err := os.Executable(); err == nil {
+		if p, e := filepath.EvalSymlinks(self); e == nil {
+			self = p
+		}
+		selfPath = self
 		go func() {
 			for i := 0; i < 20; i++ {
 				if err := os.Remove(self + ".old"); err == nil || os.IsNotExist(err) {
