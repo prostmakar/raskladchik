@@ -1849,7 +1849,7 @@ window.__pdf = { lib: pdfLib, open: openPdf };
     const groups = new Map();
     for(const n of NOTES){ const k = n.ver.split('.').slice(0,2).join('.'); if(!groups.has(k)) groups.set(k, []); groups.get(k).push(n); }
     $('#notesList').innerHTML = [...groups].map(([k, list]) => { const top = list[0].ver; const rel = vcmp(top,'1.1')>=0 && REPO; const has = list.some(n=>n.ver===CUR);
-      const body = list.map(n => { const lines = n.text.split('\n'); return `<div class="nsub"><div class="nst">${esc2(lines[0].replace(/^#+\s*/,''))}${n.ver===CUR?' <span class="cur">— у вас сейчас</span>':''}</div><div class="nt">${esc2(lines.slice(1).join('\n').trim())}</div></div>`; }).join('');
+      const body = list.filter(n => n.text.trim()).map(n => { const lines = n.text.split('\n'); return `<div class="nsub"><div class="nst"${list.filter(x=>x.text.trim()).length<2?' hidden':''}>${esc2(lines[0].replace(/^#+\s*/,''))}${n.ver===CUR?' <span class="cur">— у вас сейчас</span>':''}</div><div class="nt">${esc2(lines.slice(1).join('\n').trim())}</div></div>`; }).join('');
       return `<div class="nver"><div class="nh"><b>v${esc2(k)}</b>${list.length>1?`<span class="meta">последняя сборка v${esc2(top)}</span>`:''}${has?'<span class="cur">установлена</span>':''}<span class="spacer"></span>
         ${rel?`<a class="btn small" href="https://github.com/${REPO}/releases/download/v${top}/Raskladchik_v${top}.zip" title="Скачать архив v${top}">Скачать</a>`:''}
         ${rel&&top!==CUR&&API?`<button class="btn small${vcmp(top,CUR)>0?' primary':''}" data-inst="${esc2(top)}">${vcmp(top,CUR)>0?'Обновить до v'+esc2(top):'Установить v'+esc2(top)}</button>`:''}</div>${body}</div>`; }).join('');
