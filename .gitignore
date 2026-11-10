@@ -1,0 +1,4 @@
+dist/
+launcher/app.html
+*.zip
+__pycache__/
