@@ -190,6 +190,21 @@ func applyUpdate() error {
 	return install(r)
 }
 
+// установить выбранную версию (из списка «Что нового»)
+func applyVersion(ver string) error {
+	if verParts(ver) == nil {
+		return errors.New("неверный номер версии")
+	}
+	var r release
+	if err := ghGet("/releases/tags/v"+strings.TrimPrefix(ver, "v"), &r); err != nil {
+		return err
+	}
+	if !newer(r.Tag, version) && !newer(version, r.Tag) {
+		return errors.New("эта версия уже установлена")
+	}
+	return install(&r)
+}
+
 // вернуться на предыдущую версию (последнюю из тех, что старше текущей)
 func applyPrev() (string, error) {
 	r, err := prevRelease()
