@@ -149,6 +149,34 @@ tfoot td{border-bottom:0;background:var(--soft);font-weight:700}
 .st-title{font-size:30px;margin:0 0 6px}
 .st-title span{color:var(--accent)}
 .st-sub{color:var(--muted);margin:0 0 22px;font-size:16px}
+.nm.own{border-color:var(--accent);background:var(--accent-soft,#fff3ec)}
+.endsk{margin:6px 0 4px}
+.endsvg{width:100%;height:auto;display:block;max-height:150px}
+.endsvg .ept2{cursor:pointer}.endsvg .ept2 circle+circle{fill:var(--card,#fff);stroke:var(--muted);stroke-width:2}
+.endsvg .ept2.sel circle+circle{stroke:var(--accent)}.endsvg .ept2.long circle+circle{fill:var(--accent);stroke:var(--accent)}
+.endsvg .ept2:hover circle+circle{stroke:var(--accent);stroke-width:3}
+.endsvg .et{font-size:18px;font-weight:700;fill:var(--muted)}.endsvg .et.on{fill:var(--accent)}.endsvg .ea{font-size:13px;fill:var(--text,#333)}.endsvg .ebad{font-size:12px;fill:#c92a2a}
+.endpan{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:6px}
+.endpan .ept{display:flex;align-items:center;gap:8px;font-weight:600;margin-bottom:6px}
+.endpan .qang{display:flex;gap:4px;flex-wrap:wrap}.endpan .qang .on{border-color:var(--accent);color:var(--accent)}
+.seg.sm button{padding:4px 10px;font-size:13px}
+.nflds{display:flex;gap:12px;flex-wrap:nowrap;margin-left:auto}.nflds .nm{width:110px}
+.modal.center{align-items:center;justify-content:center}
+.dlg{background:var(--panel);border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.35);width:560px;max-width:100%;max-height:90vh;display:flex;flex-direction:column}
+.dlg.wide{width:900px}
+.dlg-h{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line)}.dlg-h h2{margin:0;font-size:18px;flex:1;white-space:nowrap}
+.dlg-h input[type=search]{flex:2;min-width:120px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);font:inherit}
+.dlg-b{padding:14px 18px;overflow:auto;min-height:0}
+.dlg-f{display:flex;align-items:center;gap:8px;padding:12px 18px;border-top:1px solid var(--line)}
+.dlg .fld.w{display:flex;flex-direction:column;gap:4px}.dlg .fld.w input{width:100%;box-sizing:border-box}
+.pair2{display:flex;gap:8px}.pair2 input{flex:1}
+.hrow{display:grid;grid-template-columns:1fr auto auto;gap:4px 14px;align-items:center;padding:10px 4px;border-bottom:1px solid var(--line)}
+.hrow .hn{font-weight:600}.hrow .hm{color:var(--muted);font-size:13px;grid-column:1}.hrow .hb{grid-row:1/3;grid-column:3;display:flex;gap:6px}
+.hrow .hd{grid-row:1/3;grid-column:2;color:var(--muted);font-size:13px;text-align:right;white-space:nowrap}
+.hrow.cur{background:color-mix(in srgb, var(--accent) 7%, transparent);border-radius:8px}
+.projbox{display:flex;align-items:center;gap:10px;justify-content:center;flex-wrap:wrap;margin:18px auto 0;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px 10px 16px;font-size:14px;color:var(--muted);max-width:980px}
+.projbox input{padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);font:inherit;min-width:0}
+.projbox .pn{width:240px}.projbox .pc{width:170px}
 .st-foot{margin-top:28px;display:flex;gap:12px;justify-content:center;align-items:center;flex-wrap:wrap;color:var(--muted);font-size:13px}
 .st-foot .new{color:var(--accent);font-weight:600}
 .st-cards{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
@@ -224,6 +252,9 @@ input.nm.sm{width:58px}
 .sheetbox{padding:12px 16px;background:var(--bg)}
 .sheetbox svg{display:block;width:100%;height:auto;max-height:70vh}
 .sheetbox .sh{fill:var(--panel);stroke:var(--muted);stroke-width:2px;vector-effect:non-scaling-stroke}
+.sheetbox .shrest,.shcan .shrest{fill:url(#restHatch);fill-opacity:1;stroke:none}
+.sheetbox .shcut,.shcan .shcut{stroke:var(--accent);stroke-width:2.5px;stroke-dasharray:10 6;vector-effect:non-scaling-stroke}
+.stats .used b{color:var(--accent)}
 .sheetbox .shm{fill:none;stroke:var(--line);stroke-dasharray:6 5;stroke-width:1px;vector-effect:non-scaling-stroke}
 .sheetbox .pp use{vector-effect:non-scaling-stroke}
 
@@ -363,8 +394,9 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
       </button>
     </div>
     <div class="prevbox" id="prevBox" hidden></div>
+    <div class="projbox" id="projBox" hidden></div>
     <p class="st-hint">Можно сразу перетащить файлы сюда: DXF откроются в «Листе», x_t / IGES / STEP / PDF / TIF — в «Трубах».</p>
-    <div class="st-foot"><span>Раскладчик v__APP_VER__</span><span id="updMsg"></span><button class="btn" id="updBtn" hidden>Обновить</button></div>
+    <div class="st-foot"><span>Раскладчик v__APP_VER__</span><span id="updMsg"></span><button class="btn" id="updBtn" hidden>Обновить</button><button class="btn" id="updPrev" hidden>Использовать предыдущую версию</button></div>
   </div>
 </div>
 
@@ -415,7 +447,7 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
   <section id="tabNest" hidden>
     <div class="ncfg">
       <div class="fld"><span>Длина хлыста, мм</span><input type="text" inputmode="decimal" class="nm" id="nS"></div>
-      <div class="fld"><span>Расстояние между деталями, мм</span><input type="text" inputmode="decimal" class="nm" id="nK"></div>
+      <div class="fld" title="Основное значение для всех профилей. Для отдельного профиля можно задать своё — в его карточке ниже."><span>Между деталями (основное), мм</span><input type="text" inputmode="decimal" class="nm" id="nK"></div>
       <div class="fld"><span>Обрезка начала хлыста, мм</span><input type="text" inputmode="decimal" class="nm" id="nT0"></div>
       <div class="fld"><span>Нерабочий остаток (зажим), мм</span><input type="text" inputmode="decimal" class="nm" id="nT1"></div>
       <div class="fld"><span>Деловой остаток от, мм</span><input type="text" inputmode="decimal" class="nm" id="nBiz"></div>
@@ -475,7 +507,7 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
     <div class="note">
       Программа проверяет каждый чертёж, но <b>сама ничего не меняет</b>: найденные ошибки (двойной рез, «круг в круге», разрывы, мусор) исправляются кнопкой «Исправить» у детали или «Исправить все». Пока чертёж не исправлен, длина реза считается как есть — вместе с двойными линиями.
       <b>Вес</b> — по площади детали (без отверстий), толщине и плотности материала. Площадь под покрытие (одна сторона и полностью) — в окне детали (🔍).
-      <b>Сохранить исправленные DXF</b> — в папку «Исправленные DXF» на рабочем столе. <b>Сохранить в Excel</b> — список деталей, а если сделана раскладка — ещё раскладка и картинки листов.
+      <b>Сохранить исправленные DXF</b> — копии в новую папку там, где укажете (можно на сервере); исходные чертежи не меняются. <b>Сохранить в Excel</b> — список деталей, а если сделана раскладка — ещё раскладка и картинки листов.
     </div>
   </section>
 
@@ -535,7 +567,7 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
     <div class="pside" id="pSide"></div>
   </div>
   <div class="note">Колесо мыши — масштаб к курсору, перетаскивание листа мышью — двигать. Оранжевые рамки — найдено автоматически, синие — выделено вручную (кнопка «Выделить» или мышь с зажатым Shift). Рамку можно передвинуть, растянуть за правый нижний угол, убрать крестиком или галочкой справа. «Как будет» — показать с закраской. «Проверено, следующий файл» — как в трубах.
-    <b>Сохранить все в PDF</b> — каждый файл (даже TIF или JPG) сохраняется как PDF в папку «Отредактированные PDF» на рабочем столе. Закрашенное удаляется по-настоящему: страница сохраняется картинкой, текста под закраской нет.
+    <b>Сохранить все в PDF</b> — каждый файл (даже TIF или JPG) сохраняется как PDF в новую папку там, где укажете (можно на сервере); исходные файлы не меняются. Закрашенное удаляется по-настоящему: страница сохраняется картинкой, текста под закраской нет.
     <b>Перенести в трубы</b> — отредактированные файлы добавляются на вкладку «Трубы», текст чертежа (кроме закрашенного) используется для чтения профиля и длины.</div>
 </div>
 
@@ -558,6 +590,20 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
     </div>
   </div>
 </div>
+<div class="modal center" id="histm" hidden><div class="dlg wide">
+  <div class="dlg-h"><h2>История проектов</h2><input type="search" id="histQ" placeholder="Поиск: название, заказчик, деталь…"><button class="ic" id="histClose">✕</button></div>
+  <div class="dlg-b" id="histList"></div>
+  <div class="dlg-f"><span class="meta" id="histDir"></span><span class="spacer"></span><button class="btn" id="histFolder">Открыть папку истории</button></div>
+</div></div>
+<div class="modal center" id="sdlg" hidden><div class="dlg">
+  <div class="dlg-h"><h2 id="sdTitle">Сохранить</h2><button class="ic" id="sdClose">✕</button></div>
+  <div class="dlg-b">
+    <div class="fld w"><span>Куда сохранить</span><div class="pair2"><input type="text" id="sdBase" placeholder="Рабочий стол"><button class="btn" id="sdPick">Выбрать…</button></div></div>
+    <div class="fld w" style="margin-top:10px"><span>Название новой папки</span><input type="text" id="sdName"></div>
+    <div class="meta" id="sdNote" style="margin-top:10px"></div>
+  </div>
+  <div class="dlg-f"><span class="spacer"></span><button class="btn" id="sdCancel">Отмена</button><button class="btn primary" id="sdOk">Сохранить</button></div>
+</div></div>
 <div class="modal" id="shm" hidden>
   <div class="ed">
     <div class="ed-left">
@@ -573,6 +619,7 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
 <div class="toast" id="sToast" hidden></div>
 <div class="askov" id="sAsk" hidden></div>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs id="nDefs"></defs></svg>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><pattern id="restHatch" patternUnits="userSpaceOnUse" width="60" height="60" patternTransform="rotate(45)"><rect width="60" height="60" fill="#e9e5dc" fill-opacity=".55"/><line x1="0" y1="0" x2="0" y2="60" stroke="#b9b2a4" stroke-width="10" stroke-opacity=".5"/></pattern></defs></svg>
 
 <!-- ===== ХЛЫСТ ===== -->
 <div class="modal" id="barm" hidden>
@@ -669,6 +716,13 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
   try{
     if(sessionStorage.getItem('dr.session')) return; // перезагрузка того же окна — ничего не трогаем
     sessionStorage.setItem('dr.session','1');
+    // прошлый проект — в историю (сохранит модуль истории, когда загрузится страница)
+    try{
+      const meta = localStorage.getItem('proj.cur'), t = localStorage.getItem('xtcut.v2'), sh = localStorage.getItem('sheet.v1');
+      const cnt = r => { try{ const d=JSON.parse(r||'null'); return d&&d.parts?d.parts.length:0; }catch(e){ return 0; } };
+      if(cnt(t)+cnt(sh)>0) localStorage.setItem('proj.pending', JSON.stringify({meta: meta?JSON.parse(meta):null, tube: t, sheet: sh}));
+    }catch(e){ try{ localStorage.removeItem('proj.pending'); }catch(e2){} }
+    localStorage.removeItem('proj.cur');
     const move = (key, prevKey, clean) => {
       const raw = localStorage.getItem(key); if(!raw) return;
       const d = JSON.parse(raw); if(!d || !d.parts || !d.parts.length) return;
@@ -934,6 +988,7 @@ function openEditor(id){
   const p = byId(id); if(!p || p.src==='xt') return;
   ed = {id, draft: JSON.parse(JSON.stringify(p)), rot:0, zoom:0, page:1};
   if(!ed.draft.ends || ed.draft.ends.length<2) ed.draft.ends=[{ang:'90',side:'a'},{ang:'90',side:'a'}];
+  ed.long=['bot', ed.draft.shape==='para'?'top':'bot']; ed.sel=0;
   $('#modal').hidden=false;
   $('#edTitle').textContent = p.file ? p.file : (p.name||'Новая деталь');
   buildForm(); updateRes(); loadPreview();
@@ -973,9 +1028,8 @@ function buildForm(){
   </div>
   <div class="fs"><div class="t">Длина и торцы</div>
     <div class="row"><div class="fld"><span>Длина L, мм (наибольшая)</span><input type="text" inputmode="decimal" class="nm" data-k="L" value="${esc(d.L)}" style="width:120px"></div></div>
-    ${[0,1].map(i=>`<div class="endrow"><label>Торец ${i+1}</label><input type="text" data-k="ends.${i}.ang" value="${esc(d.ends[i].ang)}" placeholder="90"><div style="display:flex;gap:6px"><select data-k="ends.${i}.ref" title="От чего отложен угол на чертеже"><option value="axis"${d.ends[i].ref!=='face'?' selected':''}>к оси</option><option value="face"${d.ends[i].ref==='face'?' selected':''}>к торцу</option></select>${sideOpts?`<select data-k="ends.${i}.side">${sideOpts.map(([v,t])=>`<option value="${v}"${d.ends[i].side===v?' selected':''}>${t}</option>`).join('')}</select>`:''}</div></div>`).join('')}
-    <div class="hint2">Угол как на чертеже: 90 — прямой рез; 60, 45, 56°30' — скос. «К оси» — угол между резом и длинной кромкой детали, «к торцу» — между резом и линией, перпендикулярной оси.${sideOpts?' «A/B на виде» — какая сторона профиля видна на том виде, где показан угол.':''}</div>
-    <div class="row" id="shapeRow" hidden style="margin-top:8px"><label style="min-width:62px">Скосы</label><div class="seg" id="shapeSeg"><button data-sh="trap" class="${d.shape!=='para'?'on':''}" title="Оба скоса сужают деталь с одной стороны">Трапеция ⏢</button><button data-sh="para" class="${d.shape==='para'?'on':''}" title="Скосы параллельны или наклонены в одну сторону">Параллелограмм ▱</button></div></div>
+    <div class="endsk"><div id="endSk"></div><div class="hint2">Нажмите на точку у торца: выберется этот торец, а точка станет <b>длинным углом</b> (острым концом скоса). Угол — ниже.</div></div>
+    <div id="endPanel"></div>
   </div>
   <div class="fs"><div class="t">Отверстия</div>
     ${(d.holes||[]).map((x,i)=>`<div class="row"><div class="fld"><span>Кол-во</span><input class="mini nm" type="text" inputmode="decimal" data-k="holes.${i}.n" value="${esc(x.n)}"></div><div class="fld"><span>Ø, мм</span><input class="mini nm" type="text" inputmode="decimal" data-k="holes.${i}.d" value="${esc(x.d)}"></div><button class="ic del" data-rm="holes.${i}" title="Удалить" style="margin-top:16px">×</button></div>`).join('')}
@@ -994,12 +1048,55 @@ function buildForm(){
     <div class="fld"><span>Торцовка</span><select data-k="mode">${Object.entries(MODES).map(([k,v])=>`<option value="${k}"${k===d.mode?' selected':''}>${v}</option>`).join('')}</select></div></div>
   </div>`;
   $('#edBody').innerHTML = h;
+  endPanel();
+}
+// ---- торцы: схема с точками ----
+function endPanel(){
+  const d=ed.draft, i=ed.sel, e=d.ends[i], pr=d.prof||{};
+  const sideOpts = pr.type==='round' ? null : pr.type==='channel' ? [['a','H на виде'],['b','B на виде']] : [['a','A на виде'],['b','B на виде']];
+  $('#endPanel').innerHTML = `<div class="endpan">
+    <div class="ept">Торец ${i+1} <span class="meta">${i===0?'(слева на схеме)':'(справа на схеме)'}</span><span class="spacer"></span><div class="seg sm"><button data-esel="0" class="${i===0?'on':''}">Торец 1</button><button data-esel="1" class="${i===1?'on':''}">Торец 2</button></div></div>
+    <div class="row"><div class="fld"><span>Угол, °</span><input type="text" data-k="ends.${i}.ang" value="${esc(e.ang)}" placeholder="90" style="width:90px"></div>
+      <div class="fld"><span>&nbsp;</span><div class="qang">${['90','75','60','45','30'].map(a=>`<button class="btn small${String(e.ang).trim()===a?' on':''}" data-qang="${a}">${a}°</button>`).join('')}</div></div></div>
+    <div class="row"><div class="fld"><span>Угол отложен</span><select data-k="ends.${i}.ref"><option value="axis"${e.ref!=='face'?' selected':''}>к оси (к длинной кромке)</option><option value="face"${e.ref==='face'?' selected':''}>к торцу (от перпендикуляра)</option></select></div>
+      <div class="fld"><span>Длинный угол</span><div class="seg sm"><button data-long="top" class="${ed.long[i]==='top'?'on':''}">сверху</button><button data-long="bot" class="${ed.long[i]!=='top'?'on':''}">снизу</button></div></div>
+      ${sideOpts?`<div class="fld"><span>Скос виден на стороне</span><select data-k="ends.${i}.side">${sideOpts.map(([v,t])=>`<option value="${v}"${e.side===v?' selected':''}>${t}</option>`).join('')}</select></div>`:''}</div>
+  </div>`;
+}
+function drawEnds(){
+  const box=$('#endSk'); if(!box||!ed) return;
+  const d=ed.draft;
+  d.shape = ed.long[0]===ed.long[1] ? 'trap' : 'para';
+  let g=null; try{ if(!C.validate(d).filter(m=>!/угол/i.test(m)).length) g=C.manualShape(d); }catch(e){}
+  const skewOf = i => { try{ return C.endAngleToAxis(d.ends[i])<89.99; }catch(e){ return false; } };
+  const ref = d.ends[ed.sel], plane = d.prof && d.prof.type!=='round' && ref && ref.side==='b' ? 'b' : 'a';
+  const W=600, Hh=120, x0=60, x1=W-60, yT=26, yB=Hh-26;
+  let pts; // [низ-лево, низ-право, верх-право, верх-лево] в долях длины
+  if(g && g.L>0){ const k0=0, k1=plane==='b'?1:2; pts=[[g.lo[k0],1],[g.ro[k0],1],[g.ro[k1],0],[g.lo[k1],0]].map(([x,y])=>[x/g.L,y]); }
+  else pts=[[0,1],[1,1],[1,0],[0,0]];
+  // схема рисуется так, чтобы длинный угол торца 1 был там, где его выбрали
+  const flip = ed.long[0]==='top';
+  const P = pts.map(([fx,fy])=>[x0+fx*(x1-x0), (flip?1-fy:fy)? yB : yT]);
+  const corners = [[0,P[0],flip?'top':'bot'],[1,P[1],flip?'top':'bot'],[1,P[2],flip?'bot':'top'],[0,P[3],flip?'bot':'top']];
+  const angTxt = i => { const e=d.ends[i]; const a=String(e.ang||'90').trim(); return (a||'90')+'°'+(e.ref==='face'?' к торцу':''); };
+  const isLong = (i,pos) => skewOf(i) && ed.long[i]===pos;
+  box.innerHTML = `<svg viewBox="0 0 ${W} ${Hh}" class="endsvg">
+    <polygon points="${P.map(p=>p.join(',')).join(' ')}" fill="color-mix(in srgb, var(--accent) 16%, transparent)" stroke="var(--accent)" stroke-width="2"/>
+    <line x1="${x0-20}" y1="${(yT+yB)/2}" x2="${x1+20}" y2="${(yT+yB)/2}" stroke="var(--muted)" stroke-dasharray="6 5" stroke-width="1"/>
+    ${[0,1].map(i=>`<text x="${i?x1+8:x0-8}" y="${(yT+yB)/2-6}" text-anchor="${i?'start':'end'}" class="et${ed.sel===i?' on':''}">${i+1}</text><text x="${i?x1+8:x0-8}" y="${(yT+yB)/2+14}" text-anchor="${i?'start':'end'}" class="ea">${esc(angTxt(i))}</text>`).join('')}
+    ${corners.map(([i,[x,y],pos])=>`<g class="ept2${ed.sel===i?' sel':''}${isLong(i,pos)?' long':''}" data-pt-end="${i}" data-pt-pos="${pos}"><circle cx="${x}" cy="${y}" r="16" fill="transparent"/><circle cx="${x}" cy="${y}" r="${isLong(i,pos)?8:6}"/></g>`).join('')}
+    ${g&&g.bad?`<text x="${W/2}" y="${Hh-4}" text-anchor="middle" class="ebad">скосы не помещаются в длину — проверьте углы</text>`:''}
+  </svg><div class="meta" style="font-size:12px;text-align:center">Схема — вид сбоку${d.prof&&d.prof.type!=='round'?' (сторона '+(plane==='b'?(d.prof.type==='channel'?'B':'B'):(d.prof.type==='channel'?'H':'A'))+')':''}, высота увеличена для наглядности</div>`;
 }
 function setPath(obj, path, val){ const ks=path.split('.'); let o=obj; for(let i=0;i<ks.length-1;i++) o=o[ks[i]]; o[ks[ks.length-1]]=val; }
 $('#edBody').addEventListener('input',e=>{ const k=e.target.dataset.k; if(!k||!ed) return; setPath(ed.draft,k,e.target.value); updateRes(); });
 $('#edBody').addEventListener('change',e=>{ const k=e.target.dataset.k; if(!k||!ed) return; setPath(ed.draft,k,e.target.value); updateRes(); });
 $('#edBody').addEventListener('click',e=>{
   if(!ed) return;
+  const ep=e.target.closest('[data-pt-end]'); if(ep){ const i=+ep.dataset.ptEnd; ed.sel=i; ed.long[i]=ep.dataset.ptPos; endPanel(); updateRes(); const a=$('#endPanel input[data-k$=".ang"]'); a&&a.focus(); a&&a.select(); return; }
+  const es=e.target.closest('[data-esel]'); if(es){ ed.sel=+es.dataset.esel; endPanel(); updateRes(); return; }
+  const lg=e.target.closest('[data-long]'); if(lg){ ed.long[ed.sel]=lg.dataset.long; endPanel(); updateRes(); return; }
+  const qa=e.target.closest('[data-qang]'); if(qa){ ed.draft.ends[ed.sel].ang=qa.dataset.qang; endPanel(); updateRes(); return; }
   const sh=e.target.closest('[data-sh]'); if(sh){ ed.draft.shape=sh.dataset.sh; document.querySelectorAll('#shapeSeg button').forEach(b=>b.classList.toggle('on',b.dataset.sh===ed.draft.shape)); updateRes(); return; }
   const pt=e.target.closest('[data-pt]'); if(pt){ ed.draft.prof.type=pt.dataset.pt; if(pt.dataset.pt==='round') ed.draft.prof.b=''; buildForm(); updateRes(); return; }
   const ad=e.target.closest('[data-add]'); if(ad){ const k=ad.dataset.add; (ed.draft[k]||(ed.draft[k]=[])).push(k==='holes'?{n:'',d:''}:{n:'',l:'',w:''}); buildForm(); updateRes(); const ins=$('#edBody').querySelectorAll(`[data-k^="${k}."]`); ins.length&&ins[ins.length-(k==='holes'?2:3)].focus(); return; }
@@ -1015,12 +1112,12 @@ function updateRes(showMiss){
   const d=ed.draft, miss=C.validate(d);
   const badAng = d.ends.some(e=>{ const a=C.parseAngle(e.ang); return !isFinite(a) || a<=0 || a>=180 || (e.ref==='face' && a>=90); });
   const skew = d.ends.map(e=>C.endAngleToAxis(e)<89.99);
-  const sr=$('#shapeRow'); if(sr) sr.hidden = !(skew[0]&&skew[1]);
+  drawEnds();
   if(miss.length){ $('#edRes').innerHTML = `<div class="${showMiss?'miss':'meta'}">Чтобы посчитать, укажите: ${miss.join(', ')}</div>`; return; }
   const r=C.manualAnalyze(d), s=C.summarize(r,d.mode);
   const q=Math.max(1,Math.round(num(d.qty))||1);
   const g=C.manualShape(d); const plane = d.ends.some((e,i)=>skew[i]&&e.side==='b') && d.prof.type!=='round' ? 'b' : 'a';
-  const sk = (skew[0]||skew[1]) ? `${sketchSvg(g,plane)}<div class="meta" style="font-size:12px">Эскиз для проверки формы (высота увеличена; деталь может быть показана перевёрнутой)${g.bad?' — <span class="miss">скосы не помещаются в длину, проверьте углы и форму</span>':''}</div>` : '';
+  const sk = false ? `${sketchSvg(g,plane)}<div class="meta" style="font-size:12px">Эскиз для проверки формы (высота увеличена; деталь может быть показана перевёрнутой)${g.bad?' — <span class="miss">скосы не помещаются в длину, проверьте углы и форму</span>':''}</div>` : '';
   $('#edRes').innerHTML = `<div class="meta">${esc(r.profile)} · L ${fmt(num(d.L))} мм · торцы ${s.endLens.map(x=>fmt(x)).join(' + ')} мм</div>${sk}
     <div class="big2">${fmt(s.total)} мм <span class="meta" style="font-family:inherit;font-size:14px;font-weight:400">на 1 шт · врезок ${s.pierces}${q>1?` · партия ${fmt(s.total*q/1000,3)} м`:''}</span></div>${badAng?'<div class="miss">Не понял угол торца — введите число, например 60 или 56°30\'</div>':''}`;
 }
@@ -1266,20 +1363,21 @@ function renderNest(){
   let html='';
   for(const [pk, parts] of groups){
     const S = num(nb.per[pk]) > 0 ? num(nb.per[pk]) : nb.S;
+    const gp = nb.gapPer && nb.gapPer[pk]; const K = gp!==undefined && gp!=='' && isFinite(num(gp)) && num(gp)>=0 ? num(gp) : nb.kerf;
     const color=new Map(); parts.forEach((p,i)=>color.set(p.id, COLORS[i%COLORS.length]));
     const pieces=[]; for(const p of parts){ const q=Math.max(1,Math.round(num(p.qty))||1); const g=shapeOf(p); for(let i=0;i<q;i++) pieces.push({key:p.id, name:p.name||'Деталь', g: join?g:rectOf(g)}); }
     const stock = (nb.stock[pk]||[]).filter(x=>num(x.L)>0 && num(x.n)>0);
-    const R=C.nestWithStock(pieces, S, nb.kerf, nb.t0, nb.t1, stock);
-    const R0 = join ? C.nestWithStock(pieces.map(x=>Object.assign({},x,{g:rectOf(x.g)})), S, nb.kerf, nb.t0, nb.t1, stock) : R;
+    const R=C.nestWithStock(pieces, S, K, nb.t0, nb.t1, stock);
+    const R0 = join ? C.nestWithStock(pieces.map(x=>Object.assign({},x,{g:rectOf(x.g)})), S, K, nb.t0, nb.t1, stock) : R;
     const pr = profOf(parts[0]); const kgm = pr ? C.kgPerM(pr) : NaN;
     let aO=0, aF=0, aOk=true; for(const p of parts){ const a=areaOf(p), q=Math.max(1,Math.round(num(p.qty))||1); if(!a){ aOk=false; continue; } aO+=a.outer*q; if(isFinite(a.full)) aF+=a.full*q; else aOk=false; }
-    lastNest.push({pk,S,R,R0,kgm,stock,color,prof:profOf(parts[0]),aO,aF,aOk});
+    lastNest.push({pk,S,K,R,R0,kgm,stock,color,prof:profOf(parts[0]),aO,aF,aOk});
     const waste = R.total? (1 - R.partsLen/R.total)*100 : 0;
     const bizN = R.patterns.reduce((s,pt)=>s+(pt.rest+nb.t1>=nb.biz&&pt.rest>0?pt.n:0),0);
     const stockChips = (nb.stock[pk]||[]).map((x,i)=>`<span class="schip">${fmt(num(x.L),0)} мм × ${Math.round(num(x.n))||0}<button class="ic" data-sdel="${esc(pk)}" data-si="${i}" title="Убрать">×</button></span>`).join('');
     html+=`<div class="ncard"><div class="nhead"><h3>${esc(pk)}</h3>
       <div class="stats"><span>деталей <b>${pieces.length-R.too.length}</b></span><span>хлыстов <b>${R.bars}</b> × ${fmt(S,0)} мм</span>${R.stockBars?`<span class="gain">из отходов <b>${R.stockBars}</b> шт</span>`:''}<span>отход <b>${fmt(waste,1)}%</b></span><span title="Площадь под покрытие всех деталей этого профиля">покрытие <b>${m2(aO)}</b> нар.${aOk?` · <b>${m2(aF)}</b> полн.`:''}</span>${join&&R.sharedCuts?`<span>общих резов <b>${R.sharedCuts}</b></span>`:''}${join&&R0.bars>R.bars?`<span class="gain">стыковка сэкономила <b>${R0.bars-R.bars}</b> ${R0.bars-R.bars===1?'хлыст':'хлыста'}</span>`:''}${bizN?`<span>деловых остатков <b>${bizN}</b></span>`:''}</div>
-      <span class="spacer"></span><div class="fld"><span>Хлыст для этого профиля, мм</span><input type="text" inputmode="decimal" class="nm" data-per="${esc(pk)}" value="${esc(nb.per[pk]||'')}" placeholder="${nb.S}"></div></div>
+      <span class="spacer"></span><div class="nflds"><div class="fld"><span>Между деталями, мм</span><input type="text" inputmode="decimal" class="nm${K!==nb.kerf?' own':''}" data-gap="${esc(pk)}" value="${esc(nb.gapPer&&nb.gapPer[pk]!==undefined?nb.gapPer[pk]:'')}" placeholder="${nb.kerf}" title="Пусто — как основное (${nb.kerf} мм)"></div><div class="fld"><span>Хлыст для этого профиля, мм</span><input type="text" inputmode="decimal" class="nm" data-per="${esc(pk)}" value="${esc(nb.per[pk]||'')}" placeholder="${nb.S}"></div></div></div>
       <div class="stockrow"><span class="lbl">Деловые отходы / трубы заказчика:</span>${stockChips||'<span class="meta">нет</span>'}
         <span class="sadd"><input type="text" inputmode="decimal" class="nm" placeholder="длина" data-sl="${esc(pk)}"><i>×</i><input type="text" inputmode="numeric" class="nm sm" placeholder="шт" value="1" data-sn="${esc(pk)}"><button class="btn small" data-sadd="${esc(pk)}">+ Добавить</button></span>
         ${R.unused.length?`<span class="meta">не пригодились: ${[...R.unused.reduce((m,L)=>m.set(L,(m.get(L)||0)+1),new Map())].map(([L,n])=>fmt(L,0)+' × '+n).join(', ')}</span>`:''}</div>`;
@@ -1310,7 +1408,8 @@ $('#nestOut').addEventListener('click',e=>{
   if(d){ const pk=d.dataset.sdel; const list=st.nest.stock[pk]||[]; list.splice(+d.dataset.si,1); if(!list.length) delete st.nest.stock[pk]; save(); renderNest(); }
 });
 $('#nestOut').addEventListener('keydown',e=>{ if(e.key==='Enter' && e.target.closest('.sadd')){ e.preventDefault(); e.target.closest('.sadd').querySelector('[data-sadd]').click(); } });
-$('#nestOut').addEventListener('change',e=>{ const pk=e.target.dataset.per; if(pk===undefined) return; const v=num(e.target.value); if(isFinite(v)&&v>0) st.nest.per[pk]=v; else delete st.nest.per[pk]; save(); renderNest(); });
+$('#nestOut').addEventListener('change',e=>{ const gk=e.target.dataset.gap; if(gk!==undefined){ if(!st.nest.gapPer) st.nest.gapPer={}; const t=e.target.value.trim(), v=num(t); if(t!=='' && isFinite(v) && v>=0) st.nest.gapPer[gk]=v; else delete st.nest.gapPer[gk]; save(); renderNest(); return; }
+  const pk=e.target.dataset.per; if(pk===undefined) return; const v=num(e.target.value); if(isFinite(v)&&v>0) st.nest.per[pk]=v; else delete st.nest.per[pk]; save(); renderNest(); });
 $('#btnNestCsv').addEventListener('click',saveTubeXlsx);
 function nestSheets(){
   const nb=st.nest;
@@ -1320,7 +1419,7 @@ function nestSheets(){
   for(const g of lastNest){ const m=g.R.bars*g.S/1000, kg=g.kgm*m; TB+=g.R.bars; TM+=m; if(isFinite(kg)) TK+=kg; TS+=g.R.stockBars; TAO+=g.aO/1e6; TAF+=g.aF/1e6;
     r1.push([g.pk,{v:g.S,s:'int'},{v:g.R.bars,s:'bint'},{v:m,s:'n1'},isFinite(kg)?{v:kg,s:'n1'}:'',g.R.stockBars||'',g.R.stockLen?{v:g.R.stockLen/1000,s:'n2'}:'',{v:g.R.partsLen/1000,s:'n2'},{v:g.R.total?(1-g.R.partsLen/g.R.total)*100:0,s:'n1'},g.R.too.length||'',{v:g.aO/1e6,s:'n3'},g.aOk?{v:g.aF/1e6,s:'n3'}:'—']); }
   r1.push([{v:'Итого',s:'b'},'',{v:TB,s:'bint'},{v:TM,s:'bn1'},{v:TK,s:'bn1'},TS||'','','','','',{v:TAO,s:'bn3'},{v:TAF,s:'bn3'}]);
-  r1.push([],[{v:'Параметры',s:'b'}],['Расстояние между деталями, мм',+nb.kerf],['Обрезка начала хлыста, мм',+nb.t0],['Нерабочий остаток (зажим), мм',+nb.t1],['Деловой остаток от, мм',+nb.biz],['Стыковка скосов',nb.join!==false?'да':'нет']);
+  r1.push([],[{v:'Параметры',s:'b'}],['Расстояние между деталями (основное), мм',+nb.kerf],...lastNest.filter(g=>g.K!==nb.kerf).map(g=>['  '+g.pk+' — между деталями, мм',+g.K]),['Обрезка начала хлыста, мм',+nb.t0],['Нерабочий остаток (зажим), мм',+nb.t1],['Деловой остаток от, мм',+nb.biz],['Стыковка скосов',nb.join!==false?'да':'нет']);
   const stockRows=[]; for(const g of lastNest) for(const x of g.stock) stockRows.push([g.pk,{v:num(x.L),s:'int'},{v:Math.round(num(x.n)),s:'int'}]);
   if(stockRows.length){ r1.push([],[{v:'Деловые отходы / трубы заказчика',s:'b'}],[XH('Профиль'),XH('Длина, мм'),XH('Шт')],...stockRows);
     const un=[]; for(const g of lastNest) if(g.R.unused.length) un.push(g.pk+': '+g.R.unused.map(L=>fmt(L,0)).join(', ')); if(un.length) r1.push([{v:'Не пригодились: '+un.join('; '),s:'muted'}]); }
@@ -1345,7 +1444,7 @@ function nestSheets(){
     render();
   }
 })();
-window.__app = { st, addOne, addFiles, openEditor, showTab, render };
+window.__app = { st, addOne, addFiles, openEditor, showTab, render, save };
 window.__pdf = { lib: pdfLib, open: openPdf };
 })();
 </script>
@@ -1363,6 +1462,7 @@ window.__pdf = { lib: pdfLib, open: openPdf };
   function go(mode){
     window.__mode = mode;
     $('#start').hidden = mode!=='home';
+    if(mode==='home' && window.__proj){ window.__proj.save(); window.__proj.box(); }
     $('#appTube').hidden = mode!=='tube';
     $('#appSheet').hidden = mode!=='sheet';
     $('#appPdf').hidden = mode!=='pdf';
@@ -1405,13 +1505,152 @@ window.__pdf = { lib: pdfLib, open: openPdf };
     };
     $('#prevDrop').onclick = () => { localStorage.removeItem('xtcut.prev'); localStorage.removeItem('sheet.prev'); prevInfo(); };
   }
-  prevInfo();
+  // ----- история проектов (в exe: Документы\Раскладчик\История) -----
+  const API = /^https?:$/.test(location.protocol);
+  const J = k => { try{ return JSON.parse(localStorage.getItem(k)||'null'); }catch(e){ return null; } };
+  const post = (u, b) => fetch(u, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(b)}).then(r=>r.json());
+  const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  const dt = t => t ? new Date(t).toLocaleString('ru-RU',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
+  function projInfo(tube, sheet){
+    const tp = tube&&tube.parts||[], sp = sheet&&sheet.parts||[];
+    const names = [...tp, ...sp].map(p=>p.name||p.file||'').filter(Boolean);
+    return { tubes: tp.length, sheets: sp.length, names: names.slice(0, 60) };
+  }
+  function autoName(info, t){ const d=new Date(t||Date.now()).toLocaleDateString('ru-RU'); const n=info.names.slice(0,3).join(', '); return d + (n ? ' — ' + n + (info.names.length>3?'…':'') : ''); }
+  let lastSaved = '', saving = null;
+  function saveProj(force){
+    if(!API) return Promise.resolve();
+    if(saving) return saving.then(() => saveProj(force)); // по одному: иначе два сохранения создадут два проекта
+    saving = saveProj1(force).finally(() => { saving = null; });
+    return saving;
+  }
+  async function saveProj1(force){
+    const tr = localStorage.getItem('xtcut.v2'), sr = localStorage.getItem('sheet.v1');
+    const tube = JSON.parse(tr||'null'), sheet = JSON.parse(sr||'null');
+    const info = projInfo(tube, sheet); if(!info.tubes && !info.sheets) return;
+    let meta = J('proj.cur');
+    if(!meta){ meta = { id: newId(), name: autoName(info), auto: true, customer: '', comment: '', created: Date.now() }; localStorage.setItem('proj.cur', JSON.stringify(meta)); }
+    if(meta.auto) meta.name = autoName(info, meta.created); // пока название не задали вручную — по дате и деталям
+    const data = '{"v":1,"tube":' + (tr||'null') + ',"sheet":' + (sr||'null') + '}';
+    const key = data + JSON.stringify(meta);
+    if(!force && key === lastSaved) return;
+    const m = Object.assign({}, meta, info, { updated: Date.now() });
+    try{ const r = await fetch('/api/hist/save', {method:'POST', headers:{'Content-Type':'application/json'}, body: '{"id":' + JSON.stringify(meta.id) + ',"meta":' + JSON.stringify(m) + ',"data":' + data + '}'}); if(r.ok){ lastSaved = key; const c = J('proj.cur'); if(c && c.id === meta.id && c.auto){ c.name = meta.name; localStorage.setItem('proj.cur', JSON.stringify(c)); } } }catch(e){}
+  }
+  async function flushPending(){
+    const p = J('proj.pending'); if(!p) return;
+    try{
+      const tube = JSON.parse(p.tube||'null'), sheet = JSON.parse(p.sheet||'null'); const info = projInfo(tube, sheet);
+      const meta = p.meta || { id: newId(), name: autoName(info), auto: true, customer: '', comment: '', created: Date.now() };
+      const r = await fetch('/api/hist/save', {method:'POST', headers:{'Content-Type':'application/json'}, body: '{"id":' + JSON.stringify(meta.id) + ',"meta":' + JSON.stringify(Object.assign({}, meta, info, {updated: meta.updated || Date.now()})) + ',"data":{"v":1,"tube":' + (p.tube||'null') + ',"sheet":' + (p.sheet||'null') + '}}'});
+      if(r.ok) localStorage.removeItem('proj.pending');
+    }catch(e){}
+  }
+  async function openProj(id){
+    await saveProj(true);
+    const d = await fetch('/api/hist/load?id=' + encodeURIComponent(id)).then(r=>r.ok?r.json():null).catch(()=>null);
+    if(!d){ alert('Не удалось открыть проект'); return; }
+    const meta = (await fetch('/api/hist/list').then(r=>r.json()).catch(()=>({items:[]}))).items.find(m=>m.id===id) || {id};
+    const keep = {id: meta.id, name: meta.name || '', auto: !!meta.auto, customer: meta.customer||'', comment: meta.comment||'', created: meta.created || Date.now()};
+    try{
+      localStorage.setItem('xtcut.v2', JSON.stringify(d.tube || {parts:[]}));
+      localStorage.setItem('sheet.v1', JSON.stringify(d.sheet || {parts:[]}));
+      localStorage.setItem('proj.cur', JSON.stringify(keep));
+      localStorage.removeItem('xtcut.prev'); localStorage.removeItem('sheet.prev');
+    }catch(e){ alert('Проект слишком большой для окна программы: ' + e.message); return; }
+    location.reload();
+  }
+  async function newProj(){
+    await saveProj(true);
+    const clear = k => { const d = J(k); if(!d) return; d.parts = []; if(k==='xtcut.v2' && d.nest) d.nest.stock = {}; delete d.result; localStorage.setItem(k, JSON.stringify(d)); };
+    clear('xtcut.v2'); clear('sheet.v1'); localStorage.removeItem('proj.cur');
+    location.reload();
+  }
+  function projBox(){
+    const el = $('#projBox'); if(!API){ el.hidden = true; return; }
+    const meta = J('proj.cur'); const info = projInfo(J('xtcut.v2'), J('sheet.v1'));
+    el.hidden = false;
+    const has = info.tubes || info.sheets;
+    el.innerHTML = (has ? `<span>Текущий проект:</span><input class="pn" id="pjName" placeholder="Название" value="${(meta&&meta.name||'').replace(/"/g,'&quot;')}"><input class="pc" id="pjCust" placeholder="Заказчик" value="${(meta&&meta.customer||'').replace(/"/g,'&quot;')}"><button class="btn small" id="pjNew" title="Текущий останется в истории">Новый проект</button>` : '<span>Новый проект — добавьте файлы</span>')
+      + `<button class="btn small" id="pjHist">История проектов</button>`;
+    const upd = () => { let m = J('proj.cur'); if(!m){ saveProj(true).then(()=>{ m=J('proj.cur'); if(m){ m.name=$('#pjName').value; m.customer=$('#pjCust').value; m.auto=false; localStorage.setItem('proj.cur', JSON.stringify(m)); saveProj(true); } }); return; }
+      m.name = $('#pjName').value; m.customer = $('#pjCust').value; m.auto = false; localStorage.setItem('proj.cur', JSON.stringify(m)); saveProj(true); };
+    if(has){ $('#pjName').onchange = upd; $('#pjCust').onchange = upd; $('#pjNew').onclick = () => { if(confirm('Начать новый проект? Текущий сохранится в истории.')) newProj(); }; }
+    $('#pjHist').onclick = openHist;
+  }
+  let histItems = [];
+  async function openHist(){
+    await saveProj(true);
+    $('#histm').hidden = false; $('#histList').innerHTML = '<div class="meta">Загружаю…</div>';
+    const r = await fetch('/api/hist/list').then(r=>r.json()).catch(()=>null);
+    if(!r){ $('#histList').innerHTML = '<div class="miss">Не удалось прочитать историю</div>'; return; }
+    histItems = r.items || []; $('#histDir').textContent = r.dir || ''; drawHist();
+    $('#histQ').focus();
+  }
+  function drawHist(){
+    const q = $('#histQ').value.trim().toLowerCase(); const cur = (J('proj.cur')||{}).id;
+    const esc2 = t => String(t==null?'':t).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    const list = histItems.filter(m => !q || [m.name, m.customer, m.comment, ...(m.names||[])].join(' ').toLowerCase().includes(q));
+    $('#histList').innerHTML = list.length ? list.map(m => `<div class="hrow${m.id===cur?' cur':''}"><div class="hn">${esc2(m.name||'Без названия')}${m.id===cur?' <span class="meta">(открыт сейчас)</span>':''}</div>
+      <div class="hm">${m.customer?'Заказчик: <b>'+esc2(m.customer)+'</b> · ':''}${m.tubes?'трубы — '+m.tubes+' дет.':''}${m.tubes&&m.sheets?', ':''}${m.sheets?'лист — '+m.sheets+' дет.':''}${m.names&&m.names.length?' · '+esc2(m.names.slice(0,6).join(', '))+(m.names.length>6?'…':''):''}</div>
+      <div class="hd">${dt(m.updated)}${m.created&&dt(m.created)!==dt(m.updated)?'<br><span style="opacity:.7">создан '+dt(m.created)+'</span>':''}</div>
+      <div class="hb">${m.id===cur?'':`<button class="btn small primary" data-hopen="${esc2(m.id)}">Открыть</button>`}<button class="ic" data-hdel="${esc2(m.id)}" title="Удалить из истории">🗑</button></div></div>`).join('')
+      : `<div class="meta">${histItems.length?'Ничего не найдено':'История пока пуста: проекты сохраняются сами, как только в них появляются детали.'}</div>`;
+  }
+  if(API){
+    $('#histQ').addEventListener('input', drawHist);
+    $('#histClose').onclick = () => { $('#histm').hidden = true; };
+    $('#histm').addEventListener('click', e => { if(e.target.id==='histm') $('#histm').hidden = true; });
+    $('#histFolder').onclick = () => fetch('/api/hist/open');
+    $('#histList').addEventListener('click', async e => {
+      const o = e.target.closest('[data-hopen]'); if(o){ const ti=projInfo(J('xtcut.v2'),J('sheet.v1')); if((ti.tubes||ti.sheets) && !confirm('Открыть этот проект? Текущий сохранён в истории.')) return; openProj(o.dataset.hopen); return; }
+      const d = e.target.closest('[data-hdel]'); if(d){ const m = histItems.find(x=>x.id===d.dataset.hdel); if(!confirm('Удалить из истории «'+(m&&m.name||'')+'»? Сами файлы чертежей не удаляются.')) return;
+        await post('/api/hist/delete', {id: d.dataset.hdel}); if((J('proj.cur')||{}).id===d.dataset.hdel) localStorage.removeItem('proj.cur'); histItems = histItems.filter(x=>x.id!==d.dataset.hdel); drawHist(); }
+    });
+    flushPending().then(()=>saveProj());
+    setInterval(()=>saveProj(), 4000);
+    window.addEventListener('pagehide', ()=>{ try{ const tr=localStorage.getItem('xtcut.v2'), sr=localStorage.getItem('sheet.v1'); const meta=J('proj.cur'); if(meta){ const info=projInfo(JSON.parse(tr||'null'),JSON.parse(sr||'null')); navigator.sendBeacon('/api/hist/save', new Blob(['{"id":'+JSON.stringify(meta.id)+',"meta":'+JSON.stringify(Object.assign({},meta,info,{updated:Date.now()}))+',"data":{"v":1,"tube":'+(tr||'null')+',"sheet":'+(sr||'null')+'}}'],{type:'application/json'})); } }catch(e){} });
+    $('#prevBox').hidden = true;
+  } else prevInfo();
+  projBox();
+  window.__proj = { save: saveProj, info: () => J('proj.cur'), box: projBox };
+
+  // ----- окно «Сохранить в папку»: исходники не трогаем, всё — в новую папку -----
+  window.SaveDlg = function(kind, count){
+    return new Promise(resolve => {
+      const key = 'save.base.' + kind; let base = ''; try{ base = localStorage.getItem(key) || ''; }catch(e){}
+      const meta = J('proj.cur'); const stamp = new Date().toLocaleString('ru-RU').replace(/[:/\\]/g,'-').replace(',', '');
+      const what = kind === 'pdf' ? 'Отредактированные PDF' : 'Исправленные DXF';
+      $('#sdTitle').textContent = `Сохранить ${count} ${kind==='pdf'?'PDF':'DXF'}`;
+      $('#sdBase').value = base; $('#sdName').value = (meta && meta.name && !meta.auto ? meta.name + ' — ' : '') + what + ' ' + stamp;
+      $('#sdNote').innerHTML = 'Исходные файлы <b>не изменяются</b>: в выбранном месте создаётся новая папка, а если файл с таким именем уже есть — новый получит номер «(2)». Пусто в «Куда» — на рабочий стол.';
+      $('#sdlg').hidden = false; setTimeout(()=>{ $('#sdName').focus(); $('#sdName').select(); }, 30);
+      const done = v => { $('#sdlg').hidden = true; $('#sdOk').onclick = $('#sdCancel').onclick = $('#sdClose').onclick = $('#sdPick').onclick = null; resolve(v); };
+      $('#sdCancel').onclick = $('#sdClose').onclick = () => done(null);
+      $('#sdPick').onclick = async () => { $('#sdPick').disabled = true; try{ const r = await post('/api/pickdir', {start: $('#sdBase').value, prompt: 'Куда сохранить ' + what.toLowerCase()}); if(r.error) alert(r.error); else if(r.dir) $('#sdBase').value = r.dir; }catch(e){} $('#sdPick').disabled = false; };
+      $('#sdOk').onclick = () => { const b = $('#sdBase').value.trim(); try{ localStorage.setItem(key, b); }catch(e){} done({ base: b, name: $('#sdName').value.trim() }); };
+    });
+  };
   // ----- обновление из GitHub (только в exe), проверка автоматически при запуске -----
   (function(){
     if(location.protocol!=='http:') return;
     const btn=$('#updBtn'), msg=$('#updMsg'); btn.hidden=false;
     let info=null;
-    const setInfo = r => { info=r;
+    const pb=$('#updPrev');
+    const restartTo = async (url, ver, what) => {
+      btn.disabled = pb.disabled = true; msg.textContent='скачиваю…';
+      try{
+        const r = await (await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})).json();
+        if(r.err){ msg.textContent=r.err; btn.disabled = pb.disabled = false; return; }
+        const want = r.ver || ver;
+        msg.textContent='перезапуск…';
+        for(let i=0;i<80;i++){ await new Promise(z=>setTimeout(z,500));
+          try{ const p=await (await fetch('/api/ping',{cache:'no-store'})).json(); if(p.ver===want){ location.reload(); return; } }catch(e){} }
+        msg.textContent=what+' установлена — закройте окно и запустите программу снова.';
+      }catch(e){ msg.textContent='Ошибка: '+e.message; btn.disabled = pb.disabled = false; }
+    };
+    pb.onclick = () => { if(!info||!info.prev) return; if(!confirm('Вернуться на предыдущую версию v'+info.prev+'?\n\nПригодится, если в новой что-то сломалось. Списки сохранятся. Позже можно снова обновиться кнопкой «Обновить».')) return; restartTo('/api/update/prev', info.prev, 'Предыдущая версия'); };
+    const setInfo = r => { info=r; pb.hidden = !(r && r.prev); if(r && r.prev) pb.textContent='Использовать предыдущую версию (v'+r.prev+')';
       if(r.err){ msg.textContent=''; msg.className=''; btn.textContent='Проверить обновления'; btn.title=r.err; btn.classList.remove('primary'); return; }
       if(r.newer){ msg.textContent='Доступна v'+r.latest; msg.className='new'; btn.textContent='Обновить до v'+r.latest; btn.classList.add('primary'); }
       else { msg.textContent='последняя версия'; msg.className=''; btn.textContent='Проверить обновления'; btn.classList.remove('primary'); }
@@ -1421,15 +1660,7 @@ window.__pdf = { lib: pdfLib, open: openPdf };
     btn.onclick = async () => {
       if(!info || !info.newer){ btn.disabled=true; msg.textContent='проверяю…'; await check(); btn.disabled=false; if(info&&info.err) msg.textContent=info.err; return; }
       if(!confirm('Обновить Раскладчик до v'+info.latest+'?\n\nЧто нового:\n'+(info.notes||'—')+'\n\nОкно перезапустится, списки сохранятся.')) return;
-      btn.disabled=true; msg.textContent='скачиваю…';
-      try{
-        const r = await (await fetch('/api/update/apply',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})).json();
-        if(r.err){ msg.textContent=r.err; btn.disabled=false; return; }
-        msg.textContent='перезапуск…';
-        for(let i=0;i<80;i++){ await new Promise(z=>setTimeout(z,500));
-          try{ const p=await (await fetch('/api/ping',{cache:'no-store'})).json(); if(p.ver===info.latest){ location.reload(); return; } }catch(e){} }
-        msg.textContent='Новая версия установлена — закройте окно и запустите программу снова.';
-      }catch(e){ msg.textContent='Ошибка: '+e.message; btn.disabled=false; }
+      restartTo('/api/update/apply', info.latest, 'Новая версия');
     };
   })();
   const sf = window.__STARTUP||[];

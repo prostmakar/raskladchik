@@ -491,15 +491,18 @@
       const files = [];
       for (let i = 0; i < list.length; i++) { progress(`Готовлю PDF ${i + 1} из ${list.length}…`); const b = await outFile(list[i]); files.push({ name: baseName(list[i].name) + '.pdf', bytes: b }); }
       const seen = new Map(); for (const f of files) { const k = f.name.toLowerCase(); const n = seen.get(k) || 0; seen.set(k, n + 1); if (n) f.name = f.name.replace(/\.pdf$/i, ` (${n + 1}).pdf`); }
-      progress('Сохраняю…');
       if (/^https?:$/.test(location.protocol)) {
+        progress(null);
+        const to = window.SaveDlg ? await window.SaveDlg('pdf', files.length) : {};
+        if (!to) return;
+        progress('Сохраняю…');
         try {
           const b64 = u => { let s = ''; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); };
-          const r = await fetch('/api/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ folder: 'Отредактированные PDF', files: files.map(f => ({ name: f.name, b64: b64(f.bytes) })) }) });
+          const r = await fetch('/api/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ folder: 'Отредактированные PDF', base: to.base || '', name: to.name || '', files: files.map(f => ({ name: f.name, b64: b64(f.bytes) })) }) });
           const j = await r.json(); if (!r.ok || j.error) throw new Error(j.error || 'ошибка записи');
           toast(`Сохранено ${files.length} ${plural(files.length, 'файл', 'файла', 'файлов')} в папку<br><b>${esc(j.dir)}</b>`, () => fetch('/api/open', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dir: j.dir }) }), 'Открыть папку');
           return;
-        } catch (e) { toast('Не удалось записать на рабочий стол (' + esc(e.message) + '). Скачиваю архивом.'); }
+        } catch (e) { toast('Не удалось записать в папку (' + esc(e.message) + '). Скачиваю архивом.'); }
       }
       const zip = XLSX.zip(files.map(f => ({ name: f.name, data: f.bytes })));
       const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([zip], { type: 'application/zip' })); a.download = `Отредактированные PDF ${XLSX.stamp()}.zip`; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);

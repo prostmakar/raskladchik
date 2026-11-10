@@ -113,6 +113,7 @@ type server struct {
 	quitOnce sync.Once
 	startups map[string][]startFile
 	host     string
+	saved    map[string]bool // папки, куда сохраняли в этот запуск (их можно открыть)
 }
 
 func (s *server) touch() { s.mu.Lock(); s.last = time.Now(); s.mu.Unlock() }
@@ -178,6 +179,17 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		jsonOut(w, 200, map[string]bool{"ok": true}) // новая версия сама попросит эту закрыться
+	case "/api/update/prev":
+		if r.Method != http.MethodPost || !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
+			http.Error(w, "bad request", 400)
+			return
+		}
+		v, err := applyPrev()
+		if err != nil {
+			jsonOut(w, 200, map[string]string{"err": err.Error()})
+			return
+		}
+		jsonOut(w, 200, map[string]string{"ok": "1", "ver": v})
 	case "/api/ping":
 		jsonOut(w, 200, map[string]string{"app": "dlina-reza", "ver": version})
 	case "/api/startup": // второй запуск exe передаёт свои файлы уже работающему
@@ -198,6 +210,8 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		var req struct {
 			Folder string `json:"folder"`
+			Base   string `json:"base"` // куда (выбранная папка), пусто — рабочий стол
+			Name   string `json:"name"` // название новой папки
 			Files  []struct {
 				Name string `json:"name"`
 				Text string `json:"text"`
@@ -216,6 +230,21 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			folder = "Исправленные DXF"
 		}
 		dir := filepath.Join(desktopDir(), folder, time.Now().Format("2006-01-02 15-04-05"))
+		if req.Base != "" || req.Name != "" {
+			base := filepath.Clean(req.Base)
+			if req.Base == "" {
+				base = desktopDir()
+			}
+			if st, err := os.Stat(base); err != nil || !st.IsDir() {
+				jsonOut(w, 400, map[string]string{"error": "папка не найдена: " + base})
+				return
+			}
+			name := strings.TrimSpace(cleanName(req.Name))
+			if name == "" || name == "." || name == ".." {
+				name = folder + " " + time.Now().Format("2006-01-02 15-04-05")
+			}
+			dir = filepath.Join(base, name)
+		}
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			jsonOut(w, 500, map[string]string{"error": err.Error()})
 			return
@@ -236,12 +265,37 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			if !strings.HasSuffix(low, ".dxf") && !strings.HasSuffix(low, ".pdf") {
 				name += ".dxf"
 			}
-			if err := os.WriteFile(filepath.Join(dir, name), data, 0o644); err != nil {
+			// исходники и уже сохранённое не перезаписываются: при совпадении имени — «имя (2).dxf»
+			if err := os.WriteFile(freeName(dir, name), data, 0o644); err != nil {
 				jsonOut(w, 500, map[string]string{"error": err.Error()})
 				return
 			}
 		}
+		s.mu.Lock()
+		if s.saved == nil {
+			s.saved = map[string]bool{}
+		}
+		s.saved[strings.ToLower(filepath.Clean(dir))] = true
+		s.mu.Unlock()
 		jsonOut(w, 200, map[string]string{"dir": dir})
+	case "/api/pickdir":
+		if r.Method != http.MethodPost || !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
+			http.Error(w, "bad request", 400)
+			return
+		}
+		var req struct{ Start, Prompt string }
+		json.NewDecoder(io.LimitReader(r.Body, 1<<16)).Decode(&req)
+		if req.Start == "" {
+			req.Start = desktopDir()
+		}
+		d, err := pickFolder(req.Start, req.Prompt)
+		if err != nil {
+			jsonOut(w, 200, map[string]string{"error": "не удалось открыть выбор папки: " + err.Error()})
+			return
+		}
+		jsonOut(w, 200, map[string]string{"dir": d})
+	case "/api/hist/list", "/api/hist/save", "/api/hist/load", "/api/hist/delete", "/api/hist/open":
+		s.hist(w, r)
 	case "/api/open":
 		if r.Method != http.MethodPost || !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
 			http.Error(w, "bad request", 400)
@@ -253,7 +307,10 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		json.NewDecoder(io.LimitReader(r.Body, 1<<16)).Decode(&req)
 		base := filepath.Clean(desktopDir()) + string(os.PathSeparator)
 		d := filepath.Clean(req.Dir)
-		if !strings.HasPrefix(strings.ToLower(d), strings.ToLower(base)) {
+		s.mu.Lock()
+		ok := s.saved[strings.ToLower(d)]
+		s.mu.Unlock()
+		if !ok && !strings.HasPrefix(strings.ToLower(d), strings.ToLower(base)) {
 			http.Error(w, "forbidden", 403)
 			return
 		}
@@ -261,7 +318,7 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "not found", 404)
 			return
 		}
-		exec.Command("explorer.exe", d).Start()
+		openFolder(d)
 		jsonOut(w, 200, map[string]bool{"ok": true})
 	default:
 		http.NotFound(w, r)
