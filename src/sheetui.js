@@ -98,19 +98,47 @@
   function readBytes(f) { return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(new Uint8Array(r.result)); r.onerror = () => rej(new Error('Не удалось прочитать файл')); r.readAsArrayBuffer(f); }); }
   const baseName = n => n.replace(/\.dxf$/i, '');
   const newPart = (name, file) => ({ id: nextId++, name, file, qty: 1, mat: st.def.mat, t: st.def.t, gas: st.def.gas, fixed: false });
+  const SKETCH = /\.(pdf|tiff?|jpe?g|png|bmp)$/i;
+  const sketches = []; // фото и сканы эскизов: открываются в редакторе по одному
+  function nextSketch() { const f = sketches.shift(); if (f) window.__dxfedit.open({ name: f.name.replace(/\.[^.]+$/, ''), file: f, onClose: nextSketch }); }
   async function addFiles(list) {
     for (const f of [...list]) {
+      if (SKETCH.test(f.name)) { sketches.push(f); continue; }
       if (!/\.dxf$/i.test(f.name)) { const p = newPart(f.name, f.name); p.err = 'Нужен файл DXF'; st.parts.push(p); continue; }
       addBytes(f.name, await readBytes(f));
       render(); await new Promise(r => setTimeout(r, 0));
     }
     st.dirty = true; save(); render();
+    if (sketches.length && $('#dxm').hidden) nextSketch();
   }
   function addBytes(name, bytes, path) {
     const p = newPart(baseName(name), name); if (path) p.path = path;
     st.parts.push(p); raw.set(p.id, bytes); analyzePart(p);
     st.dirty = true; save();
     return p;
+  }
+  // детали из редактора: list = [{name, bytes, qty}]
+  function addDrawn(list, path, at, like) {
+    const out = [];
+    for (const d of list) {
+      const p = newPart(d.name, d.name + '.dxf'); p.qty = d.qty || 1; p.fixed = true; p.drawn = true;
+      if (like) { p.mat = like.mat; p.t = like.t; p.gas = like.gas; }
+      if (path && list.length === 1) p.path = path;
+      if (at === undefined) st.parts.push(p); else st.parts.splice(at++, 0, p);
+      raw.set(p.id, d.bytes); analyzePart(p); out.push(p);
+    }
+    st.dirty = true; save(); showTab('parts'); render();
+    return out;
+  }
+  // деталь открывали в редакторе: вместо неё — то, что получилось (одна или несколько)
+  function replacePart(id, list, path) {
+    const i = st.parts.findIndex(x => x.id == id); if (i < 0) return addDrawn(list, path);
+    const old = st.parts[i]; raw.delete(old.id); st.sel.delete(old.id); st.parts.splice(i, 1);
+    return addDrawn(list, path, i, old);
+  }
+  function editPart(id) {
+    const p = byId(id); if (!p || !p.an) return;
+    window.__dxfedit.open({ name: p.name, contours: p.an.contours, origin: { id: p.id }, qty: qtyOf(p) });
   }
   function analyzePart(p) {
     const bytes = raw.get(p.id); if (!bytes) return;
@@ -172,7 +200,7 @@
     let html = '';
     for (const p of st.parts) {
       const chk = `<td class="ck"><input type="checkbox" data-sel="${p.id}"${st.sel.has(p.id) ? ' checked' : ''}></td>`;
-      const acts = `<td class="acts">${p.an ? `<button class="ic" data-open="${p.id}" title="Открыть">🔍</button>` : ''}<button class="ic" data-dup="${p.id}" title="Копия">⧉</button><button class="ic del" data-del="${p.id}" title="Убрать">×</button></td>`;
+      const acts = `<td class="acts">${p.an ? `<button class="ic" data-open="${p.id}" title="Открыть">🔍</button><button class="ic" data-edit="${p.id}" title="В редактор">✎</button>` : ''}<button class="ic" data-dup="${p.id}" title="Копия">⧉</button><button class="ic del" data-del="${p.id}" title="Убрать">×</button></td>`;
       if (p.err || !p.an) {
         html += `<tr>${chk}<td>${thumb(p)}</td><td><div class="name">${esc(p.name)}</div><div class="err">${esc(p.err || (p.lost ? 'Чертёж не сохранился между запусками — перетащите файл снова' : 'Нет данных'))}</div></td><td colspan="4"></td>${acts}</tr>`; continue;
       }
@@ -184,7 +212,7 @@
       const tTxt = tName(p.t);
       html += `<tr class="${s === 'err' ? 'bad' : s === 'need' ? 'needr' : ''}">${chk}
         <td class="tcell" data-open="${p.id}">${thumb(p)}</td>
-        <td><div class="name link" data-open="${p.id}">${esc(p.name)}<span class="sv ${sc}">${sl}</span>${needsFix(p) ? `<button class="btn small fixb" data-fix="${p.id}">Исправить</button>` : ''}</div>
+        <td><div class="name link" data-open="${p.id}">${esc(p.name)}<span class="sv ${sc}">${sl}</span>${needsFix(p) ? `<button class="btn small fixb" data-fix="${p.id}">Исправить</button>` : ''}${p.an.pieces.length > 1 ? `<button class="btn small fixb" data-edit="${p.id}">Разделить: ${p.an.pieces.length} дет.</button>` : ''}</div>
           <div class="meta"><span class="mt" data-open="${p.id}">${esc(matName(p.mat))} · ${tTxt ? tTxt : '<b class="missing">толщина?</b>'} · ${esc(GASES[p.gas] ? GASES[p.gas].short : '')}</span> · ${fmt(p.an.w, 1)} × ${fmt(p.an.h, 1)} мм</div>
           ${needsFix(p) ? `<div class="wtxt">${esc(iss.filter(i => i.lvl === 'fix').map(shortFix).join(' · '))}</div>` : ''}
           ${probs.map(i => `<div class="${i.lvl === 'err' ? 'err' : 'wtxt'}">${esc(i.text)}</div>`).join('')}</td>
@@ -226,7 +254,8 @@
   });
   $('#sSelAll').addEventListener('change', e => { if (e.target.checked) st.parts.forEach(p => st.sel.add(p.id)); else st.sel.clear(); render(); });
   $('#sRows').addEventListener('click', e => {
-    const t = e.target.closest('[data-open],[data-dup],[data-del],[data-fix]'); if (!t) return;
+    const t = e.target.closest('[data-edit],[data-open],[data-dup],[data-del],[data-fix]'); if (!t) return;
+    if (t.dataset.edit) { editPart(+t.dataset.edit); return; }
     if (t.dataset.fix) { const p = byId(t.dataset.fix); p.fixed = true; st.dirty = true; save(); render(); return; }
     if (t.dataset.open) openView(+t.dataset.open);
     if (t.dataset.dup) { const p = byId(t.dataset.dup); const c = JSON.parse(JSON.stringify(p)); c.id = nextId++; c.name = p.name + ' (копия)'; if (raw.has(p.id)) raw.set(c.id, raw.get(p.id)); st.parts.splice(st.parts.indexOf(p) + 1, 0, c); st.dirty = true; save(); render(); }
@@ -234,6 +263,7 @@
   });
   function fixAll() { let n = 0; for (const p of st.parts) if (needsFix(p)) { p.fixed = true; n++; } st.dirty = true; save(); render(); if (view) { drawView(false); viewSide(); } if (n) toast(`Исправлено ${n} ${plural(n, 'чертёж', 'чертежа', 'чертежей')}`); return n; }
   $('#sFixAll').addEventListener('click', fixAll);
+  $('#sDraw').addEventListener('click', () => window.__dxfedit.open({ name: 'Деталь ' + (st.parts.length + 1) }));
   $('#sClear').addEventListener('click', () => { if (st.parts.length && !confirm('Убрать все детали из списка?')) return; st.parts.length = 0; raw.clear(); st.sel.clear(); st.result = null; st.dirty = true; save(); render(); renderNest(); });
   $('#sSave').addEventListener('click', saveFixed);
   $('#sXls').addEventListener('click', exportExcel);
@@ -252,9 +282,10 @@
   const drop = $('#sDrop'), inp = $('#sFile');
   // в exe — окно «Открыть» Windows (путь запоминается в проекте)
   async function openNative() {
-    const list = await Paths.pick('dxf');
-    for (const f of list) { try { addBytes(f.name, await Paths.read(f.path), f.path); } catch (e) { const p = newPart(baseName(f.name), f.name); p.err = e.message; st.parts.push(p); } render(); await new Promise(r => setTimeout(r, 0)); }
+    const list = await Paths.pick('sheet');
+    for (const f of list) { try { if (SKETCH.test(f.name)) { sketches.push(new File([await Paths.read(f.path)], f.name)); continue; } addBytes(f.name, await Paths.read(f.path), f.path); } catch (e) { const p = newPart(baseName(f.name), f.name); p.err = e.message; st.parts.push(p); } render(); await new Promise(r => setTimeout(r, 0)); }
     st.dirty = true; save(); render();
+    if (sketches.length && $('#dxm').hidden) nextSketch();
   }
   const pickDxf = () => Paths.api ? openNative() : inp.click();
   drop.addEventListener('click', pickDxf);
@@ -262,7 +293,7 @@
   inp.addEventListener('change', () => { const f = [...inp.files]; inp.value = ''; addFiles(f); });
   ['dragenter', 'dragover'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add('over'); }));
   ['dragleave', 'drop'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove('over'); }));
-  window.addEventListener('drop', e => { if (window.__mode !== 'sheet') return; e.preventDefault(); if ($('#sModal').hidden && e.dataTransfer && e.dataTransfer.files.length) { showTab('parts'); const fs = [...e.dataTransfer.files]; addFiles(fs).then(() => window.askWhere && window.askWhere(fs)); } });
+  window.addEventListener('drop', e => { if (window.__mode !== 'sheet') return; e.preventDefault(); if ($('#sModal').hidden && $('#dxm').hidden && e.dataTransfer && e.dataTransfer.files.length) { showTab('parts'); const fs = [...e.dataTransfer.files]; addFiles(fs).then(() => window.askWhere && window.askWhere(fs)); } });
 
   // вкладки
   function showTab(t) { st.tab = t; $('#sTabParts').hidden = t !== 'parts'; $('#sTabNest').hidden = t !== 'nest'; document.querySelectorAll('#sTabs button').forEach(b => b.classList.toggle('on', b.dataset.t === t)); if (t === 'nest') renderNest(); }
@@ -756,10 +787,11 @@
     // проект открыт заново: исходные DXF — по запомненным путям (нужны для «Исправить» и если данные не сохранились)
     if (Paths.api) (async () => {
       let n = 0;
+      for (const p of st.parts) if (p.drawn && !p.path && p.an && !raw.has(p.id)) raw.set(p.id, new TextEncoder().encode(DC.writeDXF(p.an.contours)));
       for (const p of st.parts) { if (!p.path || raw.has(p.id)) continue;
         try { raw.set(p.id, await Paths.read(p.path)); if (p.lost || !p.an) { analyzePart(p); n++; } } catch (e) { if (p.lost) p.err = 'Чертёж не найден: ' + p.path; } }
       if (n) { save(); render(); }
     })();
   }
-  window.__sheet = { st, save, init, addFiles, addBytes, render, showTab, runNest, saveFixed, openView, openSheet, exportExcel, fixAll, metrics };
+  window.__sheet = { st, save, init, addFiles, addBytes, addDrawn, replacePart, editPart, render, showTab, runNest, saveFixed, openView, openSheet, exportExcel, fixAll, metrics };
 })();

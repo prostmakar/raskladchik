@@ -39,7 +39,9 @@ func pickFiles(start, filter string, multi bool) ([]string, error) {
 	return nil, nil
 }
 
-func pickSaveFile(name, filter string) (string, error) {
+func registerProjExt() {}
+
+func pickSaveFile(name, filter, title string) (string, error) {
 	if d := os.Getenv("PICK_SAVE_DIR"); d != "" {
 		return filepath.Join(d, name), nil
 	}

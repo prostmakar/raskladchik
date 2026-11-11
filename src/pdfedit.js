@@ -527,7 +527,24 @@
   $('#pFindAll').addEventListener('click', findAll);
   $('#pSave').addEventListener('click', saveAll);
   $('#pToTube').addEventListener('click', toTubes);
-  $('#pToSheet').addEventListener('click', () => toast('Чертежи PDF на листе — скоро'));
+  // страница (уже почищенная) — эскизом в редактор листа: по ней перерисовывается DXF
+  async function toSheet() {
+    if (st.busy) return; const f = st.cur; if (!f || !f.doc) { toast('Нет файлов'); return; }
+    st.busy = true;
+    try {
+      const pg = f.pages[st.page]; const page = await f.doc.getPage(st.page + 1);
+      const k = Math.min(150 / 72, 3000 / Math.max(pg.w, pg.h)); const vp = page.getViewport({ scale: k });
+      const c = document.createElement('canvas'); c.width = Math.ceil(vp.width); c.height = Math.ceil(vp.height);
+      const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+      await page.render({ canvasContext: g, viewport: vp }).promise;
+      g.fillStyle = '#fff'; for (const b of pg.boxes) if (b.on) g.fillRect(Math.floor(b.x * k), Math.floor(b.y * k), Math.ceil(b.w * k) + 1, Math.ceil(b.h * k) + 1);
+      const under = { src: c.toDataURL('image/jpeg', 0.85), w: c.width, h: c.height, mm: 25.4 / (72 * k) };
+      document.querySelector('#appPdf .modesw [data-go=sheet]').click();
+      window.__sheet.showTab('parts');
+      window.__dxfedit.open({ name: baseName(f.name), under });
+    } finally { st.busy = false; }
+  }
+  $('#pToSheet').addEventListener('click', toSheet);
   // принять чертёж из «Труб» (или «Листа») на редактирование
   async function takeBytes(name, bytes, origin) {
     const f = new File([bytes], name); f.origin = origin;

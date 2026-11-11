@@ -312,7 +312,7 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		jsonOut(w, 200, map[string]string{"dir": d})
 	case "/api/hist/list", "/api/hist/save", "/api/hist/load", "/api/hist/delete", "/api/hist/open", "/api/hist/dir":
 		s.hist(w, r)
-	case "/api/openfiles", "/api/file", "/api/findfiles", "/api/proj/export", "/api/proj/import":
+	case "/api/openfiles", "/api/file", "/api/findfiles", "/api/proj/export", "/api/proj/import", "/api/savefile":
 		s.files(w, r)
 	case "/api/open":
 		if r.Method != http.MethodPost || !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
@@ -376,6 +376,7 @@ func fileMode(files []startFile) {
 
 func main() {
 	cleanupOld()
+	go registerProjExt()
 	afterUpdate := len(os.Args) > 1 && os.Args[1] == "--after-update"
 	var files []startFile
 	if !afterUpdate {

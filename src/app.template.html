@@ -92,6 +92,34 @@ tfoot td{border-bottom:0;background:var(--soft);font-weight:700}
 
 /* editor */
 .modal{position:fixed;inset:0;background:rgba(10,10,12,.55);display:flex;z-index:20;padding:14px}
+/* редактор DXF */
+.dxsvg{flex:1;min-height:0;width:100%;display:block;background:var(--panel);cursor:default;user-select:none}
+.dxsvg.drawing{cursor:crosshair}
+.dxg{fill:none;stroke:var(--line);stroke-width:1;opacity:.6}
+.dxax{stroke:var(--muted);stroke-width:1;opacity:.45}
+.dxfill{fill:var(--accent);opacity:.1}.dxfill.hot{opacity:.28}
+.dxs{fill:none;stroke:var(--ink);stroke-width:1.6;vector-effect:non-scaling-stroke;stroke-linejoin:round}
+.dxs.hole{stroke:#2f7fd6}.dxs.open,.dxs.loose{stroke:#d6402f;stroke-dasharray:6 4}
+.dxs.sel{stroke:var(--accent);stroke-width:3}
+.dxs.draft{stroke:var(--accent);stroke-dasharray:5 4}.dxs.cal{stroke:#2fa84f;stroke-width:2.5}
+.dxlab rect{fill:var(--ink);opacity:.82}.dxlab text{fill:var(--panel);font:600 12px system-ui,sans-serif}.dxlab.hot rect{fill:var(--accent);opacity:1}
+.dxpt{fill:var(--accent)}.dxsnap{fill:none;stroke:var(--accent);stroke-width:1.5}
+.dxstat{padding:6px 12px;border-top:1px solid var(--line);background:var(--panel);color:var(--muted);font-size:13px;min-height:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#dxName{flex:1;min-width:0;font:600 18px system-ui,sans-serif;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+.dxsec{padding:10px 0;border-bottom:1px solid var(--line)}.dxsec:last-child{border-bottom:0}
+.dxsec .t{font-weight:600;margin-bottom:8px}
+.dxrow{display:flex;align-items:center;gap:6px;margin:6px 0}.dxrow.wr{flex-wrap:wrap}
+.dxrow input.nm{width:84px}.dxl{width:20px;text-align:center;color:var(--muted)}
+.dxgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px}
+.dxf{display:flex;flex-direction:column;gap:3px;font-size:13px;color:var(--muted)}.dxf input{width:100%;box-sizing:border-box}
+.dxpts{max-height:180px;overflow:auto;margin-top:6px}
+.dxpc{display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:8px;cursor:pointer}
+.dxpc:hover{background:var(--bg)}.dxpc.on{background:color-mix(in srgb,var(--accent) 14%,transparent)}
+.dxpc b{width:22px;text-align:center}.dxpc .pn{flex:1;min-width:0;padding:5px 7px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font:inherit}
+.dxpc input[type=number]{width:64px;padding:5px 6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font:inherit}
+#dxTools .on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+#dxOp{width:90px}
+#dxUnderBox{display:contents}#dxUnderBox[hidden]{display:none}
 .ed{display:flex;flex:1;background:var(--panel);border-radius:14px;overflow:hidden;min-height:0;box-shadow:0 20px 60px rgba(0,0,0,.35)}
 .ed-left{flex:1.35;display:flex;flex-direction:column;background:var(--bg);border-right:1px solid var(--line);min-width:0}
 .vtool{display:flex;gap:6px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--line);background:var(--panel);flex-wrap:wrap}
@@ -499,9 +527,9 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
 
   <section id="sTabParts">
     <div class="drop" id="sDrop" tabindex="0">
-      <b>Перетащите сюда чертежи DXF</b>
+      <b>Перетащите сюда DXF, PDF или фото эскиза</b>
       <div class="hint">или нажмите, чтобы выбрать</div>
-      <input type="file" id="sFile" accept=".dxf,.DXF" multiple hidden>
+      <input type="file" id="sFile" accept=".dxf,.DXF,.pdf,.tif,.tiff,.jpg,.jpeg,.png,.bmp" multiple hidden>
     </div>
     <div class="banner" id="sBanner" hidden></div>
     <div class="bulk">
@@ -513,6 +541,7 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
     <div class="bar">
       <span class="lbl" title="Концы ближе этого расстояния считаются соединёнными">Стягивать до</span><input type="text" inputmode="decimal" class="nm sm" id="sTolJ"><span class="lbl" title="Разрывы до этого расстояния закрываются отрезком">мм, закрывать до</span><input type="text" inputmode="decimal" class="nm sm" id="sTolB"><span class="lbl">мм</span>
       <span class="spacer"></span>
+      <button class="btn" id="sDraw">✎ Нарисовать деталь</button>
       <button class="btn primary" id="sFixAll" hidden>Исправить все</button>
       <button class="btn" id="sClear">Очистить</button>
       <button class="btn" id="sSave">Сохранить исправленные DXF</button>
@@ -607,6 +636,32 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
     </div>
   </div>
 </div>
+<!-- редактор DXF -->
+<div class="modal" id="dxm" hidden>
+  <div class="ed">
+    <div class="ed-left">
+      <div class="vtool" id="dxTools">
+        <button class="btn small" data-tool="sel">Выбор</button>
+        <button class="btn small" data-tool="rect">▭ Прямоугольник</button>
+        <button class="btn small" data-tool="circle">◯ Окружность</button>
+        <button class="btn small" data-tool="poly">⬠ Контур</button>
+        <span class="lbl">Сетка</span><input type="text" inputmode="decimal" class="nm sm" id="dxGridIn"><span class="lbl">мм</span>
+        <button class="btn small" id="dxFit">По размеру</button>
+        <button class="btn small" id="dxUndo" title="Отменить (Ctrl+Z)">↶</button>
+        <span class="spacer"></span>
+        <button class="btn small" id="dxUnder">Эскиз…</button><input type="file" id="dxUnderFile" accept=".pdf,.tif,.tiff,.jpg,.jpeg,.png,.bmp" hidden>
+        <span id="dxUnderBox" hidden><button class="btn small" data-tool="cal">Размер по 2 точкам</button><input type="range" id="dxOp" min="0.1" max="1" step="0.05" title="Яркость эскиза"><button class="btn small" id="dxUnderDel" title="Убрать эскиз">✕</button></span>
+      </div>
+      <svg class="dxsvg" id="dxSvg"></svg>
+      <div class="dxstat" id="dxStat"></div>
+    </div>
+    <div class="ed-right">
+      <div class="ed-head"><input type="text" id="dxName"><button class="ic" id="dxClose" title="Закрыть">✕</button></div>
+      <div class="ed-body" id="dxSide"></div>
+      <div class="ed-foot"><button class="btn" id="dxSave">Сохранить DXF…</button><button class="btn primary" id="dxDone">В лист</button></div>
+    </div>
+  </div>
+</div>
 <div class="modal center" id="histm" hidden><div class="dlg wide">
   <div class="dlg-h"><h2>История проектов</h2><input type="search" id="histQ" placeholder="Поиск: название, заказчик, деталь…"><button class="ic" id="histClose">✕</button></div>
   <div class="dlg-b" id="histList"></div>
@@ -618,7 +673,6 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
   <div class="dlg-b soon">
     <p><b>Стоимость реза.</b> Программа посчитает, сколько стоит резать. Вы посмотрите на цифру и тихо закроете окно.</p>
     <p><b>Коммерческое предложение.</b> КП в один клик. Заказчик всё равно попросит скидку, но уже на красивом бланке.</p>
-    <p><b>Чертежи PDF и сканы на листе.</b> Из редактора PDF — прямо в «Лист». Кнопка уже есть, начинку довезём.</p>
     <p><b>Выставление счёта.</b> Самая приятная часть. Единственная, которую ждут все, кроме заказчика.</p>
     <p class="meta">Сроки: как у подрядчика — «на следующей неделе». Всё это приедет в версии 1.5.</p>
   </div>
@@ -1561,7 +1615,7 @@ function nestSheets(){
 // ---------- startup files from the .exe ----------
 (async()=>{
   render();
-  const tubeFiles = (window.__STARTUP||[]).filter(f=>!/\.(dxf|raskl)$/i.test(f.name));
+  const tubeFiles = (window.__STARTUP||[]).filter(f=>!/\.(dxf|raskl|dsmet)$/i.test(f.name));
   if(tubeFiles.length){
     for(const f of tubeFiles){
       if(f.err){ st.parts.push({id:nextId++, src:'man', name:baseName(f.name), err:f.err, status:'fill', qty:1, mode:st.defMode, prof:{type:'rect'}, ends:[], holes:[], slots:[]}); continue; }
@@ -1587,6 +1641,9 @@ window.__pdf = { lib: pdfLib, open: openPdf };
 </script>
 <script>
 /*SHEETUI*/
+</script>
+<script>
+/*DXFEDIT*/
 </script>
 <script>
 /*PDFEDIT*/
@@ -1750,7 +1807,7 @@ window.__pdf = { lib: pdfLib, open: openPdf };
     if(r.error) alert('Не сохранилось: ' + r.error); else if(r.path) alert('Проект сохранён:\n' + r.path);
   }
   async function importProj(path){
-    if(typeof path !== 'string'){ const ps = await Paths.pick('raskl'); if(!ps.length) return; path = ps[0].path; }
+    if(typeof path !== 'string'){ const ps = await Paths.pick('proj'); if(!ps.length) return; path = ps[0].path; }
     const d = await fetch('/api/proj/import?path=' + encodeURIComponent(path)).then(r=>r.ok?r.json():null).catch(()=>null);
     if(!d || !d.raskl){ alert('Это не проект Раскладчика: ' + path); return; }
     const ti = projInfo(J('xtcut.v2'), J('sheet.v1'));
@@ -1926,9 +1983,9 @@ window.__pdf = { lib: pdfLib, open: openPdf };
     };
   })();
   const sfAll = window.__STARTUP||[];
-  const rk = sfAll.find(f=>/\.raskl$/i.test(f.name) && f.path);
+  const rk = sfAll.find(f=>/\.(raskl|dsmet)$/i.test(f.name) && f.path);
   if(rk && window.__openProjFile) setTimeout(()=>window.__openProjFile(rk.path), 300); // двойной щелчок по файлу проекта
-  const sf = sfAll.filter(f=>!/\.raskl$/i.test(f.name));
+  const sf = sfAll.filter(f=>!/\.(raskl|dsmet)$/i.test(f.name));
   const dx = sf.filter(f=>isDxf(f.name)), tb = sf.filter(f=>!isDxf(f.name));
   window.__sheet.init(dx);
   go(dx.length ? 'sheet' : tb.length ? 'tube' : 'home');

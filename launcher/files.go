@@ -1,9 +1,10 @@
 package main
 
 // Файлы по путям: окно «Открыть» Windows, чтение чертежа по запомненному пути, поиск перетащенных файлов в папке,
-// проект в файл (.raskl) и из файла.
+// проект в файл (.dsmet) и из файла, один файл через «Сохранить как».
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"io/fs"
@@ -13,7 +14,10 @@ import (
 	"strings"
 )
 
-var drawingExt = map[string]bool{".x_t": true, ".xmt_txt": true, ".igs": true, ".iges": true, ".stp": true, ".step": true, ".pdf": true, ".tif": true, ".tiff": true, ".dxf": true, ".jpg": true, ".jpeg": true, ".png": true, ".bmp": true, ".raskl": true}
+// проект одним файлом; .raskl — старое название, читается по-прежнему
+const projExt = ".dsmet"
+
+var drawingExt = map[string]bool{".x_t": true, ".xmt_txt": true, ".igs": true, ".iges": true, ".stp": true, ".step": true, ".pdf": true, ".tif": true, ".tiff": true, ".dxf": true, ".jpg": true, ".jpeg": true, ".png": true, ".bmp": true, ".raskl": true, ".dsmet": true}
 
 func (s *server) files(w http.ResponseWriter, r *http.Request) {
 	isPost := r.Method == http.MethodPost && strings.HasPrefix(r.Header.Get("Content-Type"), "application/json")
@@ -31,10 +35,12 @@ func (s *server) files(w http.ResponseWriter, r *http.Request) {
 			filter = "Чертежи DXF|*.dxf|Все файлы|*.*"
 		case "pdf":
 			filter = "PDF и сканы|*.pdf;*.tif;*.tiff;*.jpg;*.jpeg;*.png;*.bmp|Все файлы|*.*"
-		case "raskl":
-			filter = "Проект Раскладчика|*.raskl|Все файлы|*.*"
+		case "sheet":
+			filter = "DXF и эскизы|*.dxf;*.pdf;*.tif;*.tiff;*.jpg;*.jpeg;*.png;*.bmp|Чертежи DXF|*.dxf|Все файлы|*.*"
+		case "proj", "raskl":
+			filter = "Проект Раскладчика|*.dsmet;*.raskl|Все файлы|*.*"
 		}
-		paths, err := pickFiles(req.Start, filter, req.Kind != "raskl")
+		paths, err := pickFiles(req.Start, filter, req.Kind != "raskl" && req.Kind != "proj")
 		if err != nil {
 			jsonOut(w, 200, map[string]string{"error": "не удалось открыть окно выбора: " + err.Error()})
 			return
@@ -115,7 +121,7 @@ func (s *server) files(w http.ResponseWriter, r *http.Request) {
 		if name == "" || name == "." {
 			name = "Проект"
 		}
-		p, err := pickSaveFile(name+".raskl", "Проект Раскладчика|*.raskl")
+		p, err := pickSaveFile(name+projExt, "Проект Раскладчика|*"+projExt, "Раскладчик — сохранить проект")
 		if err != nil {
 			jsonOut(w, 200, map[string]string{"error": "не удалось открыть окно: " + err.Error()})
 			return
@@ -124,17 +130,53 @@ func (s *server) files(w http.ResponseWriter, r *http.Request) {
 			jsonOut(w, 200, map[string]string{})
 			return
 		}
-		if !strings.HasSuffix(strings.ToLower(p), ".raskl") {
-			p += ".raskl"
+		if !strings.HasSuffix(strings.ToLower(p), projExt) {
+			p += projExt
 		}
 		if err := os.WriteFile(p, req.Data, 0o644); err != nil {
 			jsonOut(w, 200, map[string]string{"error": err.Error()})
 			return
 		}
 		jsonOut(w, 200, map[string]string{"path": p})
+	case "/api/savefile": // один файл через окно «Сохранить как» (DXF из редактора)
+		if !isPost {
+			http.Error(w, "bad request", 400)
+			return
+		}
+		var req struct{ Name, B64 string }
+		if err := json.NewDecoder(io.LimitReader(r.Body, 256<<20)).Decode(&req); err != nil {
+			jsonOut(w, 400, map[string]string{"error": "неверные данные"})
+			return
+		}
+		data, err := base64.StdEncoding.DecodeString(req.B64)
+		if err != nil {
+			jsonOut(w, 400, map[string]string{"error": "неверные данные"})
+			return
+		}
+		name := cleanName(req.Name)
+		if strings.ToLower(filepath.Ext(name)) != ".dxf" {
+			name += ".dxf"
+		}
+		p, err := pickSaveFile(name, "Чертёж DXF|*.dxf", "Раскладчик — сохранить DXF")
+		if err != nil {
+			jsonOut(w, 200, map[string]string{"error": "не удалось открыть окно: " + err.Error()})
+			return
+		}
+		if p == "" {
+			jsonOut(w, 200, map[string]string{})
+			return
+		}
+		if strings.ToLower(filepath.Ext(p)) != ".dxf" {
+			p += ".dxf"
+		}
+		if err := os.WriteFile(p, data, 0o644); err != nil {
+			jsonOut(w, 200, map[string]string{"error": err.Error()})
+			return
+		}
+		jsonOut(w, 200, map[string]string{"path": p})
 	case "/api/proj/import": // прочитать проект из файла .raskl (путь из окна «Открыть» или из запуска)
 		p := filepath.Clean(r.URL.Query().Get("path"))
-		if !filepath.IsAbs(p) || strings.ToLower(filepath.Ext(p)) != ".raskl" {
+		if e := strings.ToLower(filepath.Ext(p)); !filepath.IsAbs(p) || (e != projExt && e != ".raskl") {
 			http.Error(w, "forbidden", 403)
 			return
 		}

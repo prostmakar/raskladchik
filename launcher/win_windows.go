@@ -109,12 +109,39 @@ func pickFiles(start, filter string, multi bool) ([]string, error) {
 }
 
 // окно «Сохранить как»
-func pickSaveFile(name, filter string) (string, error) {
+func pickSaveFile(name, filter, title string) (string, error) {
 	out, err := runPS("Add-Type -AssemblyName System.Windows.Forms;" +
-		"$d=New-Object System.Windows.Forms.SaveFileDialog;$d.Filter=" + psq(filter) + ";$d.FileName=" + psq(name) + ";$d.OverwritePrompt=$true;$d.Title='Раскладчик — сохранить проект';" +
+		"$d=New-Object System.Windows.Forms.SaveFileDialog;$d.Filter=" + psq(filter) + ";$d.FileName=" + psq(name) + ";$d.OverwritePrompt=$true;$d.Title=" + psq(title) + ";" +
 		ownerPS +
 		"if($d.ShowDialog($o) -eq 'OK'){Write-Output $d.FileName};$o.Close()")
 	return strings.TrimSpace(out), err
+}
+
+// двойной щелчок по .dsmet открывает проект: запись в реестре текущего пользователя (прав администратора не нужно).
+// Пишется при каждом запуске, если exe переехал — путь обновится сам.
+func registerProjExt() {
+	exe, err := os.Executable()
+	if err != nil {
+		return
+	}
+	const cls = `HKCU\Software\Classes\Raskladchik.Project`
+	want := `"` + exe + `" "%1"`
+	reg := func(args ...string) ([]byte, error) {
+		c := exec.Command("reg", args...)
+		c.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+		return c.Output()
+	}
+	if out, err := reg("query", cls+`\shell\open\command`, "/ve"); err == nil && strings.Contains(string(out), exe) {
+		if out2, err2 := reg("query", `HKCU\Software\Classes\.dsmet`, "/ve"); err2 == nil && strings.Contains(string(out2), "Raskladchik.Project") {
+			return
+		}
+	}
+	reg("add", `HKCU\Software\Classes\.dsmet`, "/ve", "/d", "Raskladchik.Project", "/f")
+	reg("add", cls, "/ve", "/d", "Проект Раскладчика", "/f")
+	reg("add", cls+`\DefaultIcon`, "/ve", "/d", `"`+exe+`",0`, "/f")
+	reg("add", cls+`\shell\open\command`, "/ve", "/d", want, "/f")
+	// сказать проводнику, что связи файлов изменились (SHCNE_ASSOCCHANGED)
+	syscall.NewLazyDLL("shell32.dll").NewProc("SHChangeNotify").Call(0x08000000, 0, 0, 0)
 }
 
 // настройки программы: %APPDATA%\Раскладчик\config.json
