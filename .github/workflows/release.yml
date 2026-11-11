@@ -4,7 +4,7 @@ name: release
 on:
   push:
     branches: [main]
-    paths: ['VERSION']
+    paths: ['VERSION', 'notes/**', '.github/workflows/release.yml']
   workflow_dispatch:
 permissions:
   contents: write
@@ -41,5 +41,15 @@ jobs:
           cp "dist/Раскладчик.exe" "Как пользоваться.txt" "rel/Раскладчик/"
           (cd rel && zip -qr "../Raskladchik_${TAG}.zip" "Раскладчик")
           cp "dist/Раскладчик.exe" Raskladchik.exe
-          NOTES="notes/${TAG}.md"; [ -f "$NOTES" ] || echo "Раскладчик ${TAG}" > "$NOTES"
+          NOTES=/tmp/rel.md; if [ -s "notes/${TAG}.md" ]; then tail -n +2 "notes/${TAG}.md" | sed 's/^/- /' > "$NOTES"; else echo "Мелкие правки" > "$NOTES"; fi
           gh release create "${TAG}" --target "${GITHUB_SHA}" --title "Раскладчик ${TAG}" --notes-file "$NOTES" Raskladchik.exe "Raskladchik_${TAG}.zip"
+      - name: Описания версий на GitHub — из notes/
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for f in notes/v*.md; do
+            tag="$(basename "$f" .md)"
+            gh release view "$tag" >/dev/null 2>&1 || continue
+            if [ -s "$f" ]; then tail -n +2 "$f" | sed 's/^/- /' > /tmp/body.md; else echo "Мелкие правки" > /tmp/body.md; fi
+            gh release edit "$tag" --title "Раскладчик $tag" --notes-file /tmp/body.md
+          done
