@@ -32,6 +32,15 @@
   // ---------------------------------------------------------------- IGES
   const latin = b => { let s = ''; for (let i = 0; i < b.length; i += 8192) s += String.fromCharCode.apply(null, b.subarray(i, i + 8192)); return s; };
   const toBytes = s => { const b = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) b[i] = s.charCodeAt(i) & 255; return b; };
+  // много строк → байты, кусками (одна строка на сотни мегабайт не помещается в память браузера)
+  function linesToBytes(lines, sep) {
+    const parts = []; let cur = [], len = 0, total = 0;
+    const flush = () => { if (!cur.length) return; const b = toBytes(cur.join('')); parts.push(b); total += b.length; cur = []; len = 0; };
+    for (const l of lines) { cur.push(l, sep); len += l.length + sep.length; if (len > 4e6) flush(); }
+    flush();
+    const out = new Uint8Array(total); let o = 0; for (const b of parts) { out.set(b, o); o += b.length; }
+    return out;
+  }
   const ival = t => { const x = parseFloat(String(t || '').replace(/[dD]/, 'e')); return isFinite(x) ? Math.round(x) : 0; };
   const rval = t => { const x = parseFloat(String(t || '').replace(/[dD]/, 'e')); return isFinite(x) ? x : 0; };
   // параметры как есть (строки Hollerith целиком), [0] — номер типа
@@ -172,45 +181,49 @@
   const holl = s => s.length + 'H' + s;
   // parts: [{bytes, M, name}] → текст IGES (мм)
   function buildIGES(parts, info) {
-    const out = []; // {f1, f2, toks}
+    // P пишется сразу в байты по ходу (на больших хлыстах строка целиком не помещается в память), D копится строками — он небольшой
+    const line = (s, sec, n) => (s + ' '.repeat(72)).slice(0, 72) + sec + String(n).padStart(7, '0');
+    const Dl = [], Pbytes = []; let pCount = 0, nEnt = 0, pBuf = [], pLen = 0;
+    const pFlush = () => { if (pBuf.length) { Pbytes.push(toBytes(pBuf.join(''))); pBuf = []; pLen = 0; } };
+    const emit = (f1, f2, toks) => {
+      const de = 2 * nEnt + 1; nEnt++; const pstart = pCount + 1;
+      const chunks = []; let cur = '';
+      toks.forEach((tk, k) => { const s = tk + (k === toks.length - 1 ? ';' : ','); if (cur.length + s.length > 64) { if (cur) { chunks.push(cur); cur = ''; } let r = s; while (r.length > 64) { chunks.push(r.slice(0, 64)); r = r.slice(64); } cur = r; } else cur += s; });
+      if (cur) chunks.push(cur);
+      for (const c of chunks) { pCount++; pBuf.push((c + ' '.repeat(64)).slice(0, 64) + pad8(de) + 'P' + String(pCount).padStart(7, '0') + '\r\n'); pLen += 82; }
+      if (pLen > 4e6) pFlush();
+      f1[1] = pad8(pstart); f2[3] = pad8(chunks.length);
+      Dl.push(f1.join('') + 'D' + String(de).padStart(7, '0'), f2.join('') + 'D' + String(de + 1).padStart(7, '0'));
+    };
     for (const part of parts) {
       const doc = readRaw(part.bytes);
       const { ents, newXf, num } = placeIGES(doc, part.M);
       const order = [...ents.values()].filter(e => !e.drop);
-      const base = out.length; const map = new Map(); order.forEach((e, i) => map.set(e.de, 2 * (base + i) + 1));
+      const base = nEnt; const map = new Map(); order.forEach((e, i) => map.set(e.de, 2 * (base + i) + 1));
       const xfBase = base + order.length;
       const shift = v => { v = ival(v); if (!v) return 0; const m = map.get(Math.abs(v)); return m ? (v < 0 ? -m : m) : 0; };
       for (const e of order) {
-        const f1 = e.f1.slice(), f2 = e.f2.slice(), toks = e.toks.slice();
+        const f1 = e.f1.slice(), f2 = e.f2.slice(), toks = e.toks;
         for (const k of e.lay.ptr) if (k < toks.length) toks[k] = String(shift(toks[k]));
         // ссылки из каталога: структура, тип линии, слой (отрицательные), вид, матрица, подпись, цвет (отрицательный)
         for (const i of [2, 3, 4]) { const v = ival(f1[i]); if (v < 0) f1[i] = pad8(shift(v)); }
         for (const i of [5, 7]) { const v = ival(f1[i]); if (v > 0) f1[i] = pad8(shift(v)); }
         { const v = ival(f2[2]); if (v < 0) f2[2] = pad8(shift(v)); }
         f1[6] = pad8(e.newXf !== undefined ? 2 * (xfBase + e.newXf) + 1 : e.xf ? shift(e.xf) : 0);
-        out.push({ f1, f2, toks });
+        emit(f1, f2, toks); e.toks = null;
       }
-      for (const m of newXf) out.push({ f1: [124, 0, 0, 0, 0, 0, 0, 0, '00000000'].map(pad8), f2: [124, 0, 0, 0, 0, '', '', 'POSITION', 0].map(pad8), toks: ['124', ...m.map(num)] });
+      for (const m of newXf) emit([124, 0, 0, 0, 0, 0, 0, 0, '00000000'].map(pad8), [124, 0, 0, 0, 0, '', '', 'POSITION', 0].map(pad8), ['124', ...m.map(num)]);
     }
-    // запись: S, G, D, P, T
-    const line = (s, sec, n) => (s + ' '.repeat(72)).slice(0, 72) + sec + String(n).padStart(7, '0');
+    pFlush();
     const S = (info.comment || ['Raskladchik']).map((s, i) => line(s, 'S', i + 1));
     const d = new Date(); const ds = d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0') + '.' + String(d.getHours()).padStart(2, '0') + String(d.getMinutes()).padStart(2, '0') + String(d.getSeconds()).padStart(2, '0');
     const gTok = ['1H,', '1H;', holl('Raskladchik'), holl(info.file || 'bar.igs'), holl('Raskladchik'), holl(info.ver || '1'), '32', '38', '6', '308', '15', holl('Raskladchik'), '1.', '2', '2HMM', '1', '1.', holl(ds), '0.001', '0.', holl(''), holl(''), '11', '0', holl(ds)];
     const G = []; { let cur = ''; for (let i = 0; i < gTok.length; i++) { const tk = gTok[i] + (i === gTok.length - 1 ? ';' : ','); if (cur.length + tk.length > 72) { G.push(cur); cur = ''; } cur += tk; } if (cur) G.push(cur); }
-    const Dl = [], Pl = [];
-    out.forEach((e, i) => {
-      const de = 2 * i + 1; const pstart = Pl.length + 1;
-      const chunks = []; let cur = '';
-      e.toks.forEach((tk, k) => { const s = tk + (k === e.toks.length - 1 ? ';' : ','); if (cur.length + s.length > 64) { if (cur) { chunks.push(cur); cur = ''; } let r = s; while (r.length > 64) { chunks.push(r.slice(0, 64)); r = r.slice(64); } cur = r; } else cur += s; });
-      if (cur) chunks.push(cur);
-      for (const c of chunks) Pl.push((c + ' '.repeat(64)).slice(0, 64) + pad8(de) + 'P' + String(Pl.length + 1).padStart(7, '0'));
-      const f1 = e.f1.slice(), f2 = e.f2.slice(); f1[1] = pad8(pstart); f2[3] = pad8(chunks.length);
-      Dl.push(f1.join('') + 'D' + String(de).padStart(7, '0'), f2.join('') + 'D' + String(de + 1).padStart(7, '0'));
-    });
-    const T = 'S' + String(S.length).padStart(7, '0') + 'G' + String(G.length).padStart(7, '0') + 'D' + String(Dl.length).padStart(7, '0') + 'P' + String(Pl.length).padStart(7, '0');
-    const all = [...S, ...G.map((g, i) => line(g, 'G', i + 1)), ...Dl, ...Pl, line(T, 'T', 1)];
-    return toBytes(all.join('\r\n') + '\r\n');
+    const T = 'S' + String(S.length).padStart(7, '0') + 'G' + String(G.length).padStart(7, '0') + 'D' + String(Dl.length).padStart(7, '0') + 'P' + String(pCount).padStart(7, '0');
+    const head = linesToBytes([...S, ...G.map((g, i) => line(g, 'G', i + 1)), ...Dl], '\r\n'), tail = toBytes(line(T, 'T', 1) + '\r\n');
+    let total = head.length + tail.length; for (const b of Pbytes) total += b.length;
+    const out = new Uint8Array(total); let o = 0; out.set(head, o); o += head.length; for (const b of Pbytes) { out.set(b, o); o += b.length; } out.set(tail, o);
+    return out;
   }
 
   // ---------------------------------------------------------------- STEP
@@ -266,8 +279,8 @@
     }
     const sch = (/FILE_SCHEMA\s*\([\s\S]*?\)\s*\)\s*;/.exec(head || '') || ["FILE_SCHEMA(('AUTOMOTIVE_DESIGN { 1 0 10303 214 1 1 1 1 }'));"])[0];
     const d = new Date().toISOString().slice(0, 19);
-    const txt = `ISO-10303-21;\nHEADER;\nFILE_DESCRIPTION(('${(info.comment || []).join(' / ').replace(/'/g, '')}'),'2;1');\nFILE_NAME('${(info.file || 'bar.stp').replace(/'/g, '')}','${d}',(''),(''),'Raskladchik','Raskladchik','');\n${sch}\nENDSEC;\nDATA;\n${lines.join('\n')}\nENDSEC;\nEND-ISO-10303-21;\n`;
-    return toBytes(txt);
+    const headL = ['ISO-10303-21;', 'HEADER;', `FILE_DESCRIPTION(('${(info.comment || []).join(' / ').replace(/'/g, '')}'),'2;1');`, `FILE_NAME('${(info.file || 'bar.stp').replace(/'/g, '')}','${d}',(''),(''),'Raskladchik','Raskladchik','');`, sch, 'ENDSEC;', 'DATA;'];
+    return linesToBytes(headL.concat(lines, ['ENDSEC;', 'END-ISO-10303-21;']), '\n');
   }
 
   root.TubeCut = { barMatrix, buildIGES, buildSTEP, _int: { readRaw, layout, placeIGES, compose, apP } };

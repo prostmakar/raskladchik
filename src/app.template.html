@@ -1661,40 +1661,56 @@ async function cutExport(){
       await new Promise(r=>setTimeout(r,0));
     }
     save(); showTab('nest');
-    const nb=st.nest, files=[], rep=[];
-    const d=new Date().toLocaleString('ru-RU');
-    rep.push('Раскрой труб — '+(window.fileBase?window.fileBase():''), 'Сохранено: '+d, '');
-    let bi=0;
+    const nb=st.nest, rep=[];
+    // план: какие хлысты, какие файлы
+    const plan=[]; let bi=0;
+    for(const g of lastNest) for(const pt of g.R.patterns){ bi++;
+      const it3=pt.items.filter(it=>{ const p=byId(it.p.key); return p && p.src==='xt' && !lack.has(p.id); });
+      if(it3.some(it=>byId(it.p.key).fmt!=='STEP')) plan.push({g,pt,bi,fmt:'IGES'});
+      if(it3.some(it=>byId(it.p.key).fmt==='STEP')) plan.push({g,pt,bi,fmt:'STEP'});
+    }
+    if(!plan.length){ alert('Не получилось ни одного файла:\n'+[...lack.values()].join('\n')); return; }
+    const nameOf = (g,pt,bi) => `${String(bi).padStart(2,"0")} ${g.pk} ${Math.round(pt.S||g.S)} мм${pt.stock?' отход':''} x${pt.n}`;
+    let dir='';
+    if(Paths.api){
+      const to = await window.SaveDlg('cut', plan.length); if(!to) return;
+      const r = await (await fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({folder:'Раскрой труб', base:to.base||'', name:to.name||'', files:[]})})).json();
+      if(r.error){ alert('Не сохранилось: '+r.error); return; }
+      dir=r.dir;
+    }
+    const put = async (name, bytes) => {
+      if(!Paths.api){ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([bytes])); a.download=name; a.click(); await new Promise(r=>setTimeout(r,300)); return; }
+      const r = await (await fetch('/api/savebin?dir='+encodeURIComponent(dir)+'&name='+encodeURIComponent(name),{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:bytes})).json();
+      if(r.error) throw new Error(r.error);
+    };
+    rep.push('Раскрой труб — '+(window.fileBase?window.fileBase():''), 'Сохранено: '+new Date().toLocaleString('ru-RU'), '');
+    let done=0, lastG=null;
+    for(const {g,pt,bi,fmt:ff} of plan){
+      btn.textContent=`Сохраняю ${++done} из ${plan.length}…`; await new Promise(r=>setTimeout(r,0));
+      const nm=nameOf(g,pt,bi), S=pt.S||g.S;
+      const list=[];
+      for(const it of pt.items){ const p=byId(it.p.key); if(!p || p.src!=='xt' || lack.has(p.id) || (p.fmt==='STEP')!==(ff==='STEP')) continue; list.push({bytes:srcBytes.get(p.id), M:TubeCut.barMatrix(p.res.fr, it.p.g, it.o, it.s)}); }
+      const info = { comment: ['Raskladchik v__APP_VER__', `Bar ${bi}: ${tr(g.pk)}, L=${S} mm, x${pt.n}${pt.stock?' (offcut)':''}`, `Gap ${g.K} mm, start trim ${nb.t0} mm, clamp ${nb.t1} mm`, `Parts: ${list.length}`] };
+      const twin = plan.some(q=>q.bi===bi && q.fmt!==ff);
+      const bytes = ff==='STEP' ? TubeCut.buildSTEP(list, Object.assign({file: tr(nm)+'.stp'}, info)) : TubeCut.buildIGES(list, Object.assign({file: tr(nm)+'.igs'}, info));
+      await put(nm+(ff==='STEP'?(twin?' (STEP)':'')+'.stp':'.igs'), bytes);
+    }
+    // отчёт
+    bi=0;
     for(const g of lastNest){
       rep.push('=== '+g.pk+' — хлыст '+fmt(g.S,0)+' мм, между деталями '+fmt(g.K,1)+' мм, обрезка начала '+fmt(nb.t0,0)+' мм, зажим '+fmt(nb.t1,0)+' мм');
-      for(const pt of g.R.patterns){
-        bi++; const S=pt.S||g.S; const nm=`${String(bi).padStart(2,"0")} ${g.pk} ${Math.round(S)} мм${pt.stock?' отход':''} x${pt.n}`;
-        const igs=[], stp=[], miss=[];
-        for(const it of pt.items){
-          const p=byId(it.p.key); const why = !p ? 'деталь удалена' : p.src!=='xt' ? 'нет 3D (чертёж или вручную)' : lack.get(p.id);
-          if(why){ miss.push(it.p.name+' — '+why); continue; }
-          const M=TubeCut.barMatrix(p.res.fr, it.p.g, it.o, it.s);
-          (p.fmt==='STEP'?stp:igs).push({bytes:srcBytes.get(p.id), M});
-        }
-        const info = { comment: ['Raskladchik v__APP_VER__', `Bar ${bi}: ${tr(g.pk)}, L=${S} mm, x${pt.n}${pt.stock?' (offcut)':''}`, `Gap ${g.K} mm, start trim ${nb.t0} mm, clamp ${nb.t1} mm`, `Parts: ${pt.items.length}`] };
-        if(igs.length) files.push({name: nm+'.igs', bytes: TubeCut.buildIGES(igs, Object.assign({file: tr(nm)+'.igs'}, info))});
-        if(stp.length) files.push({name: nm+(igs.length?' (STEP)':'')+'.stp', bytes: TubeCut.buildSTEP(stp, Object.assign({file: tr(nm)+'.stp'}, info))});
-        rep.push('', nm+(igs.length||stp.length?'':'  — файл не создан'), ...pt.items.map(it=>`  с ${fmt(it.s+Math.min(...it.o.lo),1)} мм: ${it.p.name} — ${fmt(it.p.g.L,1)} мм${it.o.flip?' (развёрнута)':''}`), `  остаток ${fmt(pt.rest+nb.t1,0)} мм`);
-        if(miss.length) rep.push('  нет в файле: '+miss.join('; '));
-        await new Promise(r=>setTimeout(r,0));
+      for(const pt of g.R.patterns){ bi++;
+        const miss=pt.items.map(it=>{ const p=byId(it.p.key); const why=!p?'деталь удалена':p.src!=='xt'?'нет 3D (чертёж или вручную)':lack.get(p.id); return why?it.p.name+' — '+why:''; }).filter(Boolean);
+        rep.push('', nameOf(g,pt,bi)+(plan.some(q=>q.bi===bi)?'':'  — файл не создан'), ...pt.items.map(it=>`  с ${fmt(it.s+Math.min(...it.o.lo),1)} мм: ${it.p.name} — ${fmt(it.p.g.L,1)} мм${it.o.flip?' (развёрнута)':''}`), `  остаток ${fmt(pt.rest+nb.t1,0)} мм`);
+        if(miss.length) rep.push('  нет в файле: '+[...new Set(miss)].join('; '));
       }
       if(g.R.too.length) rep.push('Не помещаются в хлыст: '+[...new Set(g.R.too.map(t=>t.name))].join(', '));
       rep.push('');
     }
-    if(!files.length){ alert('Не получилось ни одного файла:\n'+[...lack.values()].join('\n')); return; }
-    files.push({name:'Раскрой.txt', bytes:new TextEncoder().encode('\ufeff'+rep.join('\r\n'))});
-    if(!Paths.api){ for(const f of files){ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([f.bytes])); a.download=f.name; a.click(); await new Promise(r=>setTimeout(r,300)); } return; }
-    const to = await window.SaveDlg('cut', files.length-1); if(!to) return;
-    btn.textContent='Сохраняю…';
-    const r = await (await fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({folder:'Раскрой труб', base:to.base||'', name:to.name||'', files:files.map(f=>({name:f.name, b64:b64(f.bytes)}))})})).json();
-    if(r.error){ alert('Не сохранилось: '+r.error); return; }
-    st.cutDir=r.dir; save(); cutDirBtn();
-    $('#cutDoneTxt').textContent = `${files.length-1} ${files.length-1===1?'файл':'файлов'} — ${r.dir}`;
+    await put('Раскрой.txt', new TextEncoder().encode('\ufeff'+rep.join('\r\n')));
+    if(!Paths.api) return;
+    st.cutDir=dir; save(); cutDirBtn();
+    $('#cutDoneTxt').textContent = `${plan.length} ${plan.length===1?'файл':plan.length<5?'файла':'файлов'} — ${dir}`;
     $('#cutDoneLack').textContent = lack.size ? 'Без 3D: '+[...lack].map(([id,w])=>{ const p=byId(id); return (p?p.name:id)+' ('+w+')'; }).join(', ') : '';
     $('#cutDone').hidden=false;
   }catch(e){ alert('Ошибка: '+e.message); }

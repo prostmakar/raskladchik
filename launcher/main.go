@@ -294,6 +294,39 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.saved[strings.ToLower(filepath.Clean(dir))] = true
 		s.mu.Unlock()
 		jsonOut(w, 200, map[string]string{"dir": dir})
+	case "/api/savebin": // один большой файл потоком в папку, созданную /api/save в этом запуске (раскрой труб)
+		if r.Method != http.MethodPost {
+			http.Error(w, "bad request", 400)
+			return
+		}
+		dir := filepath.Clean(r.URL.Query().Get("dir"))
+		s.mu.Lock()
+		ok := s.saved[strings.ToLower(dir)]
+		s.mu.Unlock()
+		if !ok {
+			http.Error(w, "forbidden", 403)
+			return
+		}
+		name := cleanName(r.URL.Query().Get("name"))
+		low := strings.ToLower(name)
+		if !strings.HasSuffix(low, ".igs") && !strings.HasSuffix(low, ".stp") && !strings.HasSuffix(low, ".txt") {
+			http.Error(w, "bad name", 400)
+			return
+		}
+		f, err := os.Create(freeName(dir, name))
+		if err != nil {
+			jsonOut(w, 200, map[string]string{"error": err.Error()})
+			return
+		}
+		_, err = io.Copy(f, io.LimitReader(r.Body, 4<<30))
+		if cerr := f.Close(); err == nil {
+			err = cerr
+		}
+		if err != nil {
+			jsonOut(w, 200, map[string]string{"error": err.Error()})
+			return
+		}
+		jsonOut(w, 200, map[string]bool{"ok": true})
 	case "/api/pickdir":
 		if r.Method != http.MethodPost || !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
 			http.Error(w, "bad request", 400)
