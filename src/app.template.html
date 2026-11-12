@@ -93,7 +93,19 @@ tfoot td{border-bottom:0;background:var(--soft);font-weight:700}
 /* editor */
 .modal{position:fixed;inset:0;background:rgba(10,10,12,.55);display:flex;z-index:20;padding:14px}
 /* редактор DXF */
-.dxsvg{flex:1;min-height:0;width:100%;display:block;background:var(--panel);cursor:default;user-select:none}
+.dxmain{flex:1;min-height:0;display:flex}
+.dxsk{flex:1 1 0;min-width:0;position:relative;overflow:hidden;border-right:1px solid var(--line);background:#fff;cursor:grab}.dxsk.grab{cursor:grabbing}
+.dxsk img{position:absolute;left:0;top:0;transform-origin:0 0;max-width:none;user-select:none;pointer-events:none}
+.dxskx{position:absolute;top:8px;right:8px;background:var(--panel)!important;z-index:1}
+.dxcv{flex:1.25 1 0;min-width:0;position:relative}
+.dxin{position:absolute;width:130px;padding:5px 8px;font:600 14px ui-monospace,monospace;border:2px solid var(--accent);border-radius:7px;background:var(--panel);color:var(--ink);z-index:2;outline:none}
+.dxtip rect{fill:var(--panel);stroke:var(--line)}.dxtip text{fill:var(--ink);font:12px ui-monospace,monospace}
+.dxguide{stroke:var(--accent);stroke-width:1;stroke-dasharray:4 4;fill:none}
+.dxsnapt{fill:var(--accent);font:600 11px system-ui,sans-serif;paint-order:stroke;stroke:var(--panel);stroke-width:3px}
+.dxcen{stroke:var(--accent);stroke-width:1;opacity:.55}
+.dxdim path{stroke:#2f7fd6;stroke-width:1;fill:none}.dxdim text{fill:#2f7fd6;font:600 12px system-ui,sans-serif;paint-order:stroke;stroke:var(--panel);stroke-width:3px}
+.dxruler{stroke:#2fa84f;stroke-width:2;fill:none}
+.dxsvg{position:absolute;inset:0;height:100%;width:100%;display:block;background:var(--panel);cursor:default;user-select:none}
 .dxsvg.drawing{cursor:crosshair}
 .dxg{fill:none;stroke:var(--line);stroke-width:1;opacity:.6}
 .dxax{stroke:var(--muted);stroke-width:1;opacity:.45}
@@ -103,7 +115,7 @@ tfoot td{border-bottom:0;background:var(--soft);font-weight:700}
 .dxs.sel{stroke:var(--accent);stroke-width:3}
 .dxs.draft{stroke:var(--accent);stroke-dasharray:5 4}.dxs.cal{stroke:#2fa84f;stroke-width:2.5}
 .dxlab rect{fill:var(--ink);opacity:.82}.dxlab text{fill:var(--panel);font:600 12px system-ui,sans-serif}.dxlab.hot rect{fill:var(--accent);opacity:1}
-.dxpt{fill:var(--accent)}.dxsnap{fill:none;stroke:var(--accent);stroke-width:1.5}
+.dxpt{fill:var(--accent)}.dxsnap{fill:none;stroke:var(--accent);stroke-width:2}
 .dxstat{padding:6px 12px;border-top:1px solid var(--line);background:var(--panel);color:var(--muted);font-size:13px;min-height:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #dxName{flex:1;min-width:0;font:600 18px system-ui,sans-serif;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
 .dxsec{padding:10px 0;border-bottom:1px solid var(--line)}.dxsec:last-child{border-bottom:0}
@@ -118,8 +130,7 @@ tfoot td{border-bottom:0;background:var(--soft);font-weight:700}
 .dxpc b{width:22px;text-align:center}.dxpc .pn{flex:1;min-width:0;padding:5px 7px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font:inherit}
 .dxpc input[type=number]{width:64px;padding:5px 6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font:inherit}
 #dxTools .on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
-#dxOp{width:90px}
-#dxUnderBox{display:contents}#dxUnderBox[hidden]{display:none}
+#dxTools #dxOrtho.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .ed{display:flex;flex:1;background:var(--panel);border-radius:14px;overflow:hidden;min-height:0;box-shadow:0 20px 60px rgba(0,0,0,.35)}
 .ed-left{flex:1.35;display:flex;flex-direction:column;background:var(--bg);border-right:1px solid var(--line);min-width:0}
 .vtool{display:flex;gap:6px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--line);background:var(--panel);flex-wrap:wrap}
@@ -181,6 +192,7 @@ tfoot td{border-bottom:0;background:var(--soft);font-weight:700}
 .start-in{max-width:1080px;width:100%;text-align:center}
 .st-title{font-size:30px;margin:0 0 6px}
 .st-title span{color:var(--accent)}
+.st-title{position:relative;display:inline-block}.st-by{position:absolute;left:100%;top:4px;margin-left:14px;white-space:nowrap;font:600 14px system-ui,sans-serif;font-style:normal;color:var(--accent)}
 .st-sub{color:var(--muted);margin:0 0 22px;font-size:16px}
 .nm.own{border-color:var(--accent);background:color-mix(in srgb, var(--accent) 12%, var(--bg));color:var(--ink)}
 input::placeholder{color:var(--muted);opacity:.8}
@@ -222,6 +234,8 @@ input::placeholder{color:var(--muted);opacity:.8}
 .projbox{flex-direction:column;gap:8px}.projbox .pjrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:center}.projbox .pjl{font-weight:600;color:var(--ink)}
 .ibtn{width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:var(--panel);color:var(--ink);font:700 16px/1 Georgia,serif;font-style:italic;cursor:pointer}
 .ibtn:hover{border-color:var(--accent);color:var(--accent)}
+.ibtn.gear{font:400 18px/1 system-ui,sans-serif;font-style:normal}
+.setf{display:flex;flex-direction:column;gap:6px;font-size:14px;color:var(--muted)}.setf input{font:inherit;font-size:16px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink)}
 #themeSeg button.on{background:var(--ink);color:var(--panel)}
 .nver{border-bottom:1px solid var(--line);padding:12px 2px}.nver:last-child{border-bottom:0}
 .nver .nh{display:flex;align-items:center;gap:10px;margin-bottom:6px}.nver .nh b{font-size:16px}
@@ -231,7 +245,9 @@ input::placeholder{color:var(--muted);opacity:.8}
 .st-foot{margin-top:28px;display:flex;gap:12px;justify-content:center;align-items:center;flex-wrap:wrap;color:var(--muted);font-size:13px}
 .st-foot .new{color:var(--accent);font-weight:600}
 .st-cards{display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:820px;margin:0 auto}
-.st-cards .st-card[data-go=pdf]{grid-column:1/-1;justify-self:center;width:calc(50% - 8px)}
+.st-cards .st-card[data-go=pdf]{grid-column:1/-1;justify-self:center;width:calc(50% - 8px);flex-direction:row;align-items:center;gap:14px;padding:12px 18px;border-radius:14px}
+.st-card[data-go=pdf] svg{width:60px;height:40px;margin:0;flex:none}.st-card[data-go=pdf] b{font-size:17px}.st-card[data-go=pdf] span{font-size:13px}
+.pdft{display:flex;flex-direction:column;gap:3px}
 .st-card{appearance:none;font:inherit;color:var(--ink);background:var(--panel);border:1.5px solid var(--line);border-radius:18px;padding:26px 22px 22px;cursor:pointer;text-align:left;display:flex;flex-direction:column;gap:8px;transition:.15s}
 .st-card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 10px 30px rgba(0,0,0,.08)}
 .st-card svg{width:120px;height:70px;color:var(--ink);margin-bottom:6px}
@@ -430,10 +446,10 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
 <body>
 <!-- ===== START ===== -->
 <div class="start" id="start">
-  <div class="st-corner left"><button class="btn small soonbtn" id="soonBtn" title="Что в планах">⏳ Скоро</button></div>
+  <div class="st-corner left"><button class="btn small soonbtn" id="soonBtn" title="Что в планах">⏳ Скоро</button><button class="ibtn gear" id="setBtn" title="Настройки">⚙</button></div>
   <div class="st-corner"><div class="seg sm" id="themeSeg" title="Оформление"><button data-th="auto">Авто</button><button data-th="light">☀ Светлая</button><button data-th="dark">☾ Тёмная</button></div><button class="ibtn" id="notesBtn" title="Что нового — все версии">i</button></div>
   <div class="start-in">
-    <h1 class="st-title">Расклад<span>чик</span></h1>
+    <h1 class="st-title">Расклад<span>чик</span><em class="st-by" id="stBy"></em></h1>
     <p class="st-sub">Что считаем?</p>
     <div class="st-cards">
       <button class="st-card" data-go="tube">
@@ -446,7 +462,7 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
       </button>
       <button class="st-card" data-go="pdf">
         <svg viewBox="0 0 120 70" aria-hidden="true"><rect x="30" y="4" width="50" height="62" rx="4" fill="none" stroke="currentColor" stroke-width="4"/><path d="M40 18h30M40 28h30M40 38h18" stroke="currentColor" stroke-width="3"/><rect x="52" y="44" width="40" height="16" rx="2" fill="var(--accent)"/></svg>
-        <b>Редактирование PDF</b><span>Закрасить организации, печати, фамилии на чертежах и сканах. Сохранить в PDF или перенести в «Трубы».</span>
+        <div class="pdft"><b>Редактирование PDF</b><span>Закрасить организации, печати, фамилии на чертежах и сканах.</span></div>
       </button>
     </div>
     <div class="prevbox" id="prevBox" hidden></div>
@@ -486,10 +502,10 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
     <div class="tablebox">
       <table>
         <thead><tr>
-          <th>Деталь</th><th>Торцовка</th><th class="num">Кол-во</th><th class="num">Рез на 1 шт, мм</th><th class="num">Врезок на 1 шт</th><th class="num">Рез всего, м</th><th></th>
+          <th>Деталь</th><th>Торцовка</th><th class="num">Кол-во</th><th class="num">Рез на 1 шт, мм</th><th class="num">Рез всего, м</th><th></th>
         </tr></thead>
         <tbody id="rows"></tbody>
-        <tfoot id="foot" hidden><tr><td>Итого</td><td></td><td class="num" id="tQty"></td><td></td><td class="num" id="tPier"></td><td class="num" id="tLen"></td><td></td></tr></tfoot>
+        <tfoot id="foot" hidden><tr><td>Итого</td><td></td><td class="num" id="tQty"></td><td></td><td class="num" id="tLen"></td><td></td></tr></tfoot>
       </table>
     </div>
     
@@ -644,15 +660,16 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
         <button class="btn small" data-tool="sel">Выбор</button>
         <button class="btn small" data-tool="rect">▭ Прямоугольник</button>
         <button class="btn small" data-tool="circle">◯ Окружность</button>
-        <button class="btn small" data-tool="poly">⬠ Контур</button>
+        <button class="btn small" data-tool="seg">╱ Отрезок</button>
+        <button class="btn small" id="dxOrtho" title="F8, Shift — на время наоборот">Орто</button>
+        <button class="btn small" data-tool="ruler">📏 Линейка</button>
         <span class="lbl">Сетка</span><input type="text" inputmode="decimal" class="nm sm" id="dxGridIn"><span class="lbl">мм</span>
-        <button class="btn small" id="dxFit">По размеру</button>
+        <button class="btn small" id="dxFit" title="Показать всё">⤢</button>
         <button class="btn small" id="dxUndo" title="Отменить (Ctrl+Z)">↶</button>
         <span class="spacer"></span>
-        <button class="btn small" id="dxUnder">Эскиз…</button><input type="file" id="dxUnderFile" accept=".pdf,.tif,.tiff,.jpg,.jpeg,.png,.bmp" hidden>
-        <span id="dxUnderBox" hidden><button class="btn small" data-tool="cal">Размер по 2 точкам</button><input type="range" id="dxOp" min="0.1" max="1" step="0.05" title="Яркость эскиза"><button class="btn small" id="dxUnderDel" title="Убрать эскиз">✕</button></span>
+        <button class="btn small" id="dxUnder">Чертёж…</button><input type="file" id="dxUnderFile" accept=".pdf,.tif,.tiff,.jpg,.jpeg,.png,.bmp" hidden>
       </div>
-      <svg class="dxsvg" id="dxSvg"></svg>
+      <div class="dxmain"><div class="dxsk" id="dxSk" hidden><img id="dxSkImg" alt=""><button class="ic dxskx" id="dxUnderDel" title="Убрать чертёж">✕</button></div><div class="dxcv"><svg class="dxsvg" id="dxSvg"></svg><input type="text" id="dxIn" class="dxin" autocomplete="off" hidden></div></div>
       <div class="dxstat" id="dxStat"></div>
     </div>
     <div class="ed-right">
@@ -668,6 +685,10 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
   <div class="dlg-f"><span class="meta" id="histDir"></span><span class="spacer"></span><button class="btn" id="histChange">Сменить папку…</button><button class="btn" id="histFolder">Открыть папку</button></div>
 </div></div>
 <div class="wherebar" id="whereBar" hidden></div>
+<div class="modal center" id="setm" hidden><div class="dlg">
+  <div class="dlg-h"><h2>Настройки</h2><button class="ic" id="setClose">✕</button></div>
+  <div class="dlg-b"><label class="setf">Имя<input type="text" id="setName" placeholder="Андрей" autocomplete="off"></label></div>
+</div></div>
 <div class="modal center" id="soonm" hidden><div class="dlg">
   <div class="dlg-h"><h2>Скоро. Наверное.</h2><button class="ic" id="soonClose">✕</button></div>
   <div class="dlg-b soon">
@@ -983,20 +1004,20 @@ function render(){
   $('#todo').hidden = !todo.length;
   if(todo.length){ const f=todo.filter(p=>p.status==='fill').length, c=todo.length-f;
     $('#todoText').innerHTML = `Ждут ввода: <b>${todo.length}</b> ${todo.length===1?'деталь':'деталей'}${c?` (из них ${c} заполнены по PDF — нужно проверить)`:''}. Они не войдут в итог, пока не подтвердите.`; }
-  if(!st.parts.length){ tb.innerHTML='<tr><td colspan="7" class="empty">Пока пусто — перетащите файлы или добавьте деталь вручную</td></tr>'; $('#foot').hidden=true; renderNest(); return; }
+  if(!st.parts.length){ tb.innerHTML='<tr><td colspan="6" class="empty">Пока пусто — перетащите файлы или добавьте деталь вручную</td></tr>'; $('#foot').hidden=true; renderNest(); return; }
   let tq=0,tp=0,tl=0, html='';
   for(const p of st.parts){
     const [bl,bc]=p.fmt?[p.fmt,'xt']:(SRC[p.src]||SRC.man);
     const acts = `<td class="acts">${p.src!=='xt'&&!p.err?`<button class="ic" data-edit="${p.id}" title="Открыть">✎</button>`:''}${p.src==='xt'&&p.res?`<button class="ic" data-view="${p.id}" title="Посмотреть 3D">🔍</button>`:''}${(p.src==='pdf'||p.src==='tif')&&!p.err&&(previews.has(p.id)||(p.path&&Paths.api))?`<button class="ic" data-pedit="${p.id}" title="В редактор PDF">🖍</button>`:''}<button class="ic" data-dup="${p.id}" title="Копия (например, для исполнения -01)">⧉</button><button class="ic del" data-del="${p.id}" title="Убрать">×</button></td>`;
     const nameCls = !p.err && (p.src!=='xt' || p.res) ? 'name link' : 'name';
     const head = `<div class="${nameCls}" ${p.src!=='xt'&&!p.err?`data-edit="${p.id}"`:p.src==='xt'&&p.res?`data-view="${p.id}"`:''}><span class="badge ${bc}">${bl}</span>${esc(p.name||'Без названия')}${p.status==='fill'&&!p.err?'<span class="st fill">заполните</span>':p.status==='check'?'<span class="st check">проверьте</span>':''}</div>`;
-    if(p.src==='xt' && !p.res && !p.err){ html+=`<tr><td>${head}<div class="meta">Считаю…</div></td><td colspan="5"></td>${acts}</tr>`; continue; }
-    if(p.err){ html+=`<tr><td>${head}<div class="err">${esc(p.err)}</div></td><td colspan="5"></td>${acts}</tr>`; continue; }
+    if(p.src==='xt' && !p.res && !p.err){ html+=`<tr><td>${head}<div class="meta">Считаю…</div></td><td colspan="4"></td>${acts}</tr>`; continue; }
+    if(p.err){ html+=`<tr><td>${head}<div class="err">${esc(p.err)}</div></td><td colspan="4"></td>${acts}</tr>`; continue; }
     const r = analysisOf(p);
     const pk = profileKey(p), L = partLen(p);
     const meta = `${pk?esc(pk):'профиль не указан'}${isFinite(L)&&L>0?' · длина '+fmt(L)+' мм':''}`;
     if(!r || needs(p)){
-      html+=`<tr class="need"><td>${head}<div class="meta">${meta}</div></td><td colspan="5" class="meta" style="padding-top:14px">${p.status==='check'?'Значения взяты с чертежа — откройте, сверьте и подтвердите.':'Откройте деталь и введите размеры по чертежу.'}</td>${acts}</tr>`; continue;
+      html+=`<tr class="need"><td>${head}<div class="meta">${meta}</div></td><td colspan="4" class="meta" style="padding-top:14px">${p.status==='check'?'Значения взяты с чертежа — откройте, сверьте и подтвердите.':'Откройте деталь и введите размеры по чертежу.'}</td>${acts}</tr>`; continue;
     }
     const s = C.summarize(r, p.mode);
     const chips=[];
@@ -1009,16 +1030,16 @@ function render(){
       <td>${head}<div class="meta">${meta}</div><div class="chips">${chips.join('')}</div>${warn}</td>
       <td><select data-mode="${p.id}">${Object.entries(MODES).map(([k,v])=>`<option value="${k}"${k===p.mode?' selected':''}>${v}</option>`).join('')}</select>${s.nEndsFound===0?'<div class="meta">торцы не найдены</div>':''}</td>
       <td class="num"><input type="number" min="1" step="1" value="${qty}" data-qty="${p.id}"></td>
-      <td class="num big">${fmt(s.total)}</td><td class="num">${s.pierces}</td><td class="num big" data-tot="${p.id}">${fmt(totalM,3)}</td>${acts}</tr>`;
+      <td class="num big">${fmt(s.total)}</td><td class="num big" data-tot="${p.id}">${fmt(totalM,3)}</td>${acts}</tr>`;
   }
   tb.innerHTML=html;
-  $('#foot').hidden=false; $('#tQty').textContent=tq; $('#tPier').textContent=tp.toLocaleString('ru-RU'); $('#tLen').textContent=fmt(tl,3);
+  $('#foot').hidden=false; $('#tQty').textContent=tq; $('#tLen').textContent=fmt(tl,3);
   renderNest();
 }
 function updateTotals(){
   let tq=0,tp=0,tl=0;
   for(const p of st.parts){ const r=analysisOf(p); if(!r||needs(p)||p.err) continue; const s=C.summarize(r,p.mode); const q=Math.max(1,Math.round(num(p.qty))||1); tq+=q; tp+=s.pierces*q; tl+=s.total*q/1000; const c=document.querySelector(`[data-tot="${p.id}"]`); if(c) c.textContent=fmt(s.total*q/1000,3); }
-  $('#tQty').textContent=tq; $('#tPier').textContent=tp.toLocaleString('ru-RU'); $('#tLen').textContent=fmt(tl,3);
+  $('#tQty').textContent=tq; $('#tLen').textContent=fmt(tl,3);
 }
 const byId = id => st.parts.find(p=>p.id==id);
 $('#rows').addEventListener('change',e=>{
@@ -1069,7 +1090,7 @@ function downloadCsv(rows, fname){
 }
 const n2 = x => String(Math.round(x*100)/100).replace('.',',');
 const XH = v => ({v, s:'h'});
-function xlsxName(base){ return `${base}_${XLSX.stamp()}.xlsx`; }
+function xlsxName(base){ return `${window.fileBase()} — ${base.replace(/_/g,' ')}.xlsx`; }
 // ---------- Excel: одна книга — детали, закупка, раскрой ----------
 function partsSheet(){
   const rows=[[{v:'Детали — лазерный труборез',s:'title'}],[{v:'Сохранено: '+new Date().toLocaleString('ru-RU'),s:'muted'}],[],
@@ -1297,7 +1318,7 @@ function updateRes(showMiss){
   const g=C.manualShape(d); const plane = d.ends.some((e,i)=>skew[i]&&e.side==='b') && d.prof.type!=='round' ? 'b' : 'a';
   const sk = false ? `${sketchSvg(g,plane)}<div class="meta" style="font-size:12px">Эскиз для проверки формы (высота увеличена; деталь может быть показана перевёрнутой)${g.bad?' — <span class="miss">скосы не помещаются в длину, проверьте углы и форму</span>':''}</div>` : '';
   $('#edRes').innerHTML = `<div class="meta">${esc(r.profile)} · L ${fmt(num(d.L))} мм · торцы ${s.endLens.map(x=>fmt(x)).join(' + ')} мм</div>${sk}
-    <div class="big2">${fmt(s.total)} мм <span class="meta" style="font-family:inherit;font-size:14px;font-weight:400">на 1 шт · врезок ${s.pierces}${q>1?` · партия ${fmt(s.total*q/1000,3)} м`:''}</span></div>${badAng?'<div class="miss">Не понял угол торца — введите, например, 60 или 38:20 (38°20′)</div>':''}`;
+    <div class="big2">${fmt(s.total)} мм <span class="meta" style="font-family:inherit;font-size:14px;font-weight:400">на 1 шт${q>1?` · партия ${fmt(s.total*q/1000,3)} м`:''}</span></div>${badAng?'<div class="miss">Не понял угол торца — введите, например, 60 или 38:20 (38°20′)</div>':''}`;
 }
 
 // viewer
@@ -1469,7 +1490,6 @@ function openView3d(id){
     ${angs?kv('Углы торцов к оси', angs):''}
     ${kv('Торцовка', esc(MODES[p.mode]))}
     ${kv('Рез на 1 шт', fmt(s.total,1)+' мм','acc')}
-    ${kv('Врезок на 1 шт', s.pierces)}
     ${kv(`Рез на все ${q} шт`, fmt(s.total*q/1000,3)+' м')}
     ${(a=>a?kv('Покрытие 1 шт', m2(a.outer)+' нар. / '+m2(a.full)+' полн.')+kv(`Покрытие на все ${q} шт`, m2(a.outer*q)+' / '+m2(a.full*q)):'')(areaOf(p))}
     <div class="fs"><div class="t">Контуры реза — наведите, чтобы подсветить</div>
@@ -1706,6 +1726,24 @@ window.__pdf = { lib: pdfLib, open: openPdf };
   const J = k => { try{ return JSON.parse(localStorage.getItem(k)||'null'); }catch(e){ return null; } };
   const post = (u, b) => fetch(u, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(b)}).then(r=>r.json());
   const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  window.userName = () => { try{ return localStorage.getItem('app.user') || ''; }catch(e){ return ''; } };
+  // «от Андрея»: родительный падеж по окончанию — для имён и фамилий хватает
+  function gen(w){
+    if(/(ова|ева|ёва|ина|ына|ая)$/i.test(w)) return w.replace(/а$|ая$/i, m => m.length===2 ? 'ой' : 'ой');
+    if(/[гкхжчшщ]а$/i.test(w)) return w.slice(0,-1)+'и';
+    if(/а$/i.test(w)) return w.slice(0,-1)+'ы';
+    if(/я$/i.test(w)) return w.slice(0,-1)+'и';
+    if(/[йь]$/i.test(w)) return w.slice(0,-1)+'я';
+    if(/[бвгджзклмнпрстфхцчшщ]$/i.test(w)) return w+'а';
+    return w;
+  }
+  window.fromWhom = n => n ? 'от ' + n.trim().split(/\s+/).map(w => /^[А-ЯЁа-яё-]+$/.test(w) ? gen(w) : w).join(' ') : '';
+  window.__by = () => { const m = J('proj.cur'); const el = $('#stBy'); if(el) el.textContent = window.fromWhom(m && m.author); };
+  // имя файла: дата — проект — заказчик — имя
+  window.fileBase = () => {
+    const m = J('proj.cur') || {}; const nm = String(m.name||'').replace(/^\d{1,2}\.\d{1,2}\.\d{4}( — )?/, '');
+    return [new Date().toLocaleDateString('ru-RU'), m.auto ? '' : nm, m.customer, m.author || window.userName()].map(x => String(x||'').trim()).filter(Boolean).join(' — ').replace(/[\\/:*?"<>|]+/g, ' ');
+  };
   const dt = t => t ? new Date(t).toLocaleString('ru-RU',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
   function projInfo(tube, sheet){
     const tp = tube&&tube.parts||[], sp = sheet&&sheet.parts||[];
@@ -1726,7 +1764,7 @@ window.__pdf = { lib: pdfLib, open: openPdf };
     const info = projInfo(tube, sheet);
     let meta = J('proj.cur');
     if(!info.tubes && !info.sheets && !(meta && !meta.auto)) return; // пустой проект сохраняем, только если ему дали название
-    if(!meta){ meta = { id: newId(), name: autoName(info), auto: true, customer: '', comment: '', created: Date.now() }; localStorage.setItem('proj.cur', JSON.stringify(meta)); }
+    if(!meta){ meta = { id: newId(), name: autoName(info), auto: true, customer: '', comment: '', created: Date.now(), author: window.userName() }; localStorage.setItem('proj.cur', JSON.stringify(meta)); }
     if(meta.auto) meta.name = autoName(info, meta.created); // пока название не задали вручную — по дате и деталям
     const data = '{"v":1,"tube":' + (tr||'null') + ',"sheet":' + (sr||'null') + '}';
     const key = data + JSON.stringify(meta);
@@ -1738,7 +1776,7 @@ window.__pdf = { lib: pdfLib, open: openPdf };
     const p = J('proj.pending'); if(!p) return;
     try{
       const tube = JSON.parse(p.tube||'null'), sheet = JSON.parse(p.sheet||'null'); const info = projInfo(tube, sheet);
-      const meta = p.meta || { id: newId(), name: autoName(info), auto: true, customer: '', comment: '', created: Date.now() };
+      const meta = p.meta || { id: newId(), name: autoName(info), auto: true, customer: '', comment: '', created: Date.now(), author: window.userName() };
       const r = await fetch('/api/hist/save', {method:'POST', headers:{'Content-Type':'application/json'}, body: '{"id":' + JSON.stringify(meta.id) + ',"meta":' + JSON.stringify(Object.assign({}, meta, info, {updated: meta.updated || Date.now()})) + ',"data":{"v":1,"tube":' + (p.tube||'null') + ',"sheet":' + (p.sheet||'null') + '}}'});
       if(r.ok) localStorage.removeItem('proj.pending');
     }catch(e){}
@@ -1751,7 +1789,7 @@ window.__pdf = { lib: pdfLib, open: openPdf };
     applyProject(d, meta);
   }
   function applyProject(d, meta){
-    const keep = {id: meta.id || newId(), name: meta.name || '', auto: !!meta.auto, customer: meta.customer||'', comment: meta.comment||'', created: meta.created || Date.now()};
+    const keep = {id: meta.id || newId(), name: meta.name || '', auto: !!meta.auto, customer: meta.customer||'', comment: meta.comment||'', created: meta.created || Date.now(), author: meta.author||''};
     try{
       localStorage.setItem('xtcut.v2', JSON.stringify(d.tube || {parts:[]}));
       localStorage.setItem('sheet.v1', JSON.stringify(d.sheet || {parts:[]}));
@@ -1764,7 +1802,7 @@ window.__pdf = { lib: pdfLib, open: openPdf };
     await saveProj(true);
     const clear = k => { const d = J(k); if(!d) return; d.parts = []; if(k==='xtcut.v2' && d.nest) d.nest.stock = {}; delete d.result; localStorage.setItem(k, JSON.stringify(d)); };
     clear('xtcut.v2'); clear('sheet.v1');
-    const meta = { id: newId(), name: name || '', auto: !name, customer: customer || '', comment: '', created: Date.now() };
+    const meta = { id: newId(), name: name || '', auto: !name, customer: customer || '', comment: '', created: Date.now(), author: window.userName() };
     if(!meta.name) meta.name = autoName({names: []}, meta.created);
     localStorage.setItem('proj.cur', JSON.stringify(meta));
     lastSaved = ''; await saveProj(true);
@@ -1786,7 +1824,7 @@ window.__pdf = { lib: pdfLib, open: openPdf };
     el.innerHTML = `<div class="pjrow"><span class="pjl">Проект:</span><input class="pn" id="pjName" placeholder="Название проекта" value="${q(meta&&meta.name)}"><input class="pc" id="pjCust" placeholder="Заказчик" value="${q(meta&&meta.customer)}"><span class="meta">${has ? (info.tubes?'трубы '+info.tubes:'') + (info.tubes&&info.sheets?' · ':'') + (info.sheets?'лист '+info.sheets:'') + ' дет.' : ''}</span></div>
       <div class="pjrow btns"><button class="btn small" id="pjNew">＋ Новый проект</button><button class="btn small" id="pjHist">🗂 История проектов</button><button class="btn small" id="pjOpen">📂 Открыть проект из файла…</button><button class="btn small" id="pjExport"${has||meta?'':' disabled'}>💾 Сохранить проект в файл…</button></div>`;
     const upd = () => { let m = J('proj.cur');
-      if(!m){ m = { id: newId(), name: '', auto: false, customer: '', comment: '', created: Date.now() }; }
+      if(!m){ m = { id: newId(), name: '', auto: false, customer: '', comment: '', created: Date.now(), author: window.userName() }; }
       m.name = $('#pjName').value.trim() || autoName(info, m.created); m.customer = $('#pjCust').value.trim(); m.auto = !$('#pjName').value.trim();
       localStorage.setItem('proj.cur', JSON.stringify(m)); saveProj(true); projTag(); $('#pjExport').disabled = false; };
     $('#pjName').onchange = upd; $('#pjCust').onchange = upd;
@@ -1801,7 +1839,7 @@ window.__pdf = { lib: pdfLib, open: openPdf };
     await saveProj(true);
     const m = J('proj.cur') || {}; const tr = localStorage.getItem('xtcut.v2'), sr = localStorage.getItem('sheet.v1');
     const info = projInfo(JSON.parse(tr||'null'), JSON.parse(sr||'null'));
-    const body = '{"name":' + JSON.stringify(m.name || 'Проект') + ',"data":{"raskl":1,"app":"__APP_VER__","meta":' + JSON.stringify(Object.assign({}, m, info, {updated: Date.now()})) + ',"tube":' + (tr||'null') + ',"sheet":' + (sr||'null') + '}}';
+    const body = '{"name":' + JSON.stringify(window.fileBase() || 'Проект') + ',"data":{"raskl":1,"app":"__APP_VER__","meta":' + JSON.stringify(Object.assign({}, m, info, {updated: Date.now()})) + ',"tube":' + (tr||'null') + ',"sheet":' + (sr||'null') + '}}';
     const r = await fetch('/api/proj/export', {method:'POST', headers:{'Content-Type':'application/json'}, body}).then(r=>r.json()).catch(e=>({error:e.message}));
     if(r.error) alert('Не сохранилось: ' + r.error); else if(r.path) alert('Проект сохранён:\n' + r.path);
   }
@@ -1836,7 +1874,7 @@ window.__pdf = { lib: pdfLib, open: openPdf };
     const esc2 = t => String(t==null?'':t).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
     const list = histItems.filter(m => !q || [m.name, m.customer, m.comment, ...(m.names||[])].join(' ').toLowerCase().includes(q));
     $('#histList').innerHTML = list.length ? list.map(m => `<div class="hrow${m.id===cur?' cur':''}"><div class="hn">${esc2(m.name||'Без названия')}${m.id===cur?' <span class="meta">(открыт сейчас)</span>':''}</div>
-      <div class="hm">${m.customer?'Заказчик: <b>'+esc2(m.customer)+'</b> · ':''}${m.tubes?'трубы — '+m.tubes+' дет.':''}${m.tubes&&m.sheets?', ':''}${m.sheets?'лист — '+m.sheets+' дет.':''}${m.names&&m.names.length?' · '+esc2(m.names.slice(0,6).join(', '))+(m.names.length>6?'…':''):''}</div>
+      <div class="hm">${m.author?esc2(window.fromWhom(m.author))+' · ':''}${m.customer?'Заказчик: <b>'+esc2(m.customer)+'</b> · ':''}${m.tubes?'трубы — '+m.tubes+' дет.':''}${m.tubes&&m.sheets?', ':''}${m.sheets?'лист — '+m.sheets+' дет.':''}${m.names&&m.names.length?' · '+esc2(m.names.slice(0,6).join(', '))+(m.names.length>6?'…':''):''}</div>
       <div class="hd">${dt(m.updated)}${m.created&&dt(m.created)!==dt(m.updated)?'<br><span style="opacity:.7">создан '+dt(m.created)+'</span>':''}</div>
       <div class="hb">${m.id===cur?'':`<button class="btn small primary" data-hopen="${esc2(m.id)}">Открыть</button>`}<button class="ic" data-hdel="${esc2(m.id)}" title="Удалить из истории">🗑</button></div></div>`).join('')
       : `<div class="meta">${histItems.length?'Ничего не найдено':'Пусто'}</div>`;
@@ -1865,7 +1903,7 @@ window.__pdf = { lib: pdfLib, open: openPdf };
   } else prevInfo();
   projBox();
   window.__proj = { save: saveProj, info: () => J('proj.cur'), box: projBox, tag: projTag };
-  projTag();
+  projTag(); window.__by();
 
   // ----- перетащили файлы: Windows не говорит программе, откуда они — спросим папку и найдём их там -----
   window.askWhere = function(files){
@@ -1914,6 +1952,18 @@ window.__pdf = { lib: pdfLib, open: openPdf };
         ${rel&&top!==CUR&&API?`<button class="btn small${vcmp(top,CUR)>0?' primary':''}" data-inst="${esc2(top)}">${vcmp(top,CUR)>0?'Обновить до v'+esc2(top):'Установить v'+esc2(top)}</button>`:''}</div>${body}</div>`; }).join('');
   }
   $('#soonBtn').onclick = () => { $('#soonm').hidden = false; };
+  // ----- настройки: пока только имя — им подписываются проекты -----
+  const closeSet = () => { $('#setm').hidden = true; window.__by(); };
+  $('#setBtn').onclick = () => { $('#setName').value = window.userName(); $('#setm').hidden = false; $('#setName').focus(); };
+  $('#setName').addEventListener('change', e => {
+    try{ localStorage.setItem('app.user', e.target.value.trim()); }catch(err){}
+    const m = J('proj.cur'); if(m && !m.author && window.userName()){ m.author = window.userName(); localStorage.setItem('proj.cur', JSON.stringify(m)); if(window.__proj) window.__proj.save(true); }
+    window.__by();
+  });
+  $('#setName').addEventListener('keydown', e => { if(e.key === 'Enter') e.target.blur(), closeSet(); });
+  $('#setClose').onclick = closeSet;
+  $('#setm').addEventListener('click', e => { if(e.target.id==='setm') closeSet(); });
+  document.addEventListener('keydown', e => { if(e.key==='Escape' && !$('#setm').hidden) closeSet(); });
   $('#soonClose').onclick = () => { $('#soonm').hidden = true; };
   $('#soonm').addEventListener('click', e => { if(e.target.id==='soonm') $('#soonm').hidden = true; });
   $('#notesBtn').onclick = () => { drawNotes(); $('#notesMsg').textContent=''; $('#notesm').hidden=false; };

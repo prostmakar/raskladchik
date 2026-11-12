@@ -769,7 +769,7 @@
       sheets.push({ name: 'Листы', cols: [140], rows: imgRows, images, heights, landscape: true });
     }
     const bytes = XLSX.build(sheets);
-    XLSX.download(bytes, `Лист_${st.result ? 'раскладка' : 'детали'}_${XLSX.stamp()}.xlsx`);
+    XLSX.download(bytes, `${window.fileBase()} — Лист ${st.result ? 'раскладка' : 'детали'}.xlsx`);
     toast('Файл Excel — в папке «Загрузки».');
   }
 

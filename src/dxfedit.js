@@ -1,16 +1,18 @@
-// ===== Лист: простой редактор — нарисовать деталь, разобрать общий DXF на детали, перерисовать эскиз по подложке =====
+// ===== Лист: простой редактор — нарисовать деталь, разобрать общий DXF на детали, перерисовать эскиз (чертёж сбоку) =====
 (function () {
   'use strict';
   const $ = s => document.querySelector(s);
   const DC = window.DXFClean;
   const num = v => { const s = String(v === undefined || v === null ? '' : v).trim().replace(',', '.'); return s === '' ? NaN : +s; };
-  const fmt = (x, d = 1) => { const v = Math.round((isFinite(x) ? x : 0) * 10 ** d) / 10 ** d; return String(v).replace('.', ','); };
+  const fmt = (x, d = 1) => { const v = Math.round((isFinite(x) ? x : 0) * 10 ** d) / 10 ** d; return String(Object.is(v, -0) ? 0 : v).replace('.', ','); };
   const esc = s => String(s === undefined || s === null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const TAU = Math.PI * 2;
   const B90 = Math.tan(Math.PI / 8); // выпуклость дуги 90°
+  const near = (a, b, e = 1e-6) => Math.abs(a[0] - b[0]) < e && Math.abs(a[1] - b[1]) < e;
 
   let E = null; // состояние открытого редактора
   let lastIn = { w: '', h: '', d: '' };
+  let ortho = true; // как «Орто» в Компасе: отрезки только по горизонтали и вертикали; Shift — наоборот
 
   // ---------------------------------------------------------------- геометрия фигур
   function arc(cx, cy, r, a0, a1, n) { const o = []; for (let i = 0; i <= n; i++) { const a = a0 + (a1 - a0) * i / n; o.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]); } return o; }
@@ -26,7 +28,7 @@
     if (s.type === 'poly') return s.pts.map(p => [p[0], p[1]]);
     return s.poly; // imp
   }
-  const closedOf = s => s.type === 'imp' ? !!s.closed : true;
+  const closedOf = s => s.type === 'imp' ? !!s.closed : s.type === 'poly' ? s.closed !== false : true;
   // контур для записи в DXF
   function contourOf(s) {
     const poly = polyOf(s);
@@ -38,7 +40,7 @@
         : [[x, y, 0], [x + w, y, 0], [x + w, y + h, 0], [x, y + h, 0]];
       return { closed: true, verts, poly };
     }
-    if (s.type === 'poly') return { closed: true, verts: s.pts.map(p => [p[0], p[1], 0]), poly };
+    if (s.type === 'poly') return { closed: closedOf(s), verts: s.pts.map(p => [p[0], p[1], 0]), poly };
     return { closed: s.closed, circle: s.circle || null, verts: s.verts, poly: s.poly };
   }
   function bboxOf(P) { let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity; for (const p of P) { if (p[0] < x0) x0 = p[0]; if (p[0] > x1) x1 = p[0]; if (p[1] < y0) y0 = p[1]; if (p[1] > y1) y1 = p[1]; } return [x0, y0, x1, y1]; }
@@ -54,6 +56,7 @@
   }
   // опорная точка фигуры: у круга — центр, у остальных — левый нижний угол габарита
   function refOf(s) { if (s.type === 'circle') return [s.cx, s.cy]; const b = bboxOf(polyOf(s)); return [b[0], b[1]]; }
+  function centerOf(s) { if (s.type === 'circle') return [s.cx, s.cy]; if (s.type === 'imp' && s.circle) return s.circle.c; const b = bboxOf(polyOf(s)); return [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2]; }
 
   // ---------------------------------------------------------------- детали: наружный контур + его отверстия
   function structure() {
@@ -90,35 +93,105 @@
   function evPt(e) { const r = $('#dxSvg').getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
   function fit() {
     const r = $('#dxSvg').getBoundingClientRect(); let P = E.shapes.flatMap(polyOf);
-    if (E.under) P = P.concat([[E.under.x, E.under.y], [E.under.x + E.under.w * E.under.s, E.under.y - E.under.h * E.under.s]]);
     if (!P.length) P = [[0, 0], [300, 200]];
     const b = bboxOf(P), w = Math.max(b[2] - b[0], 1), h = Math.max(b[3] - b[1], 1);
-    const k = Math.min((r.width - 80) / w, (r.height - 80) / h);
+    const k = Math.max(0.01, Math.min((r.width - 100) / w, (r.height - 100) / h));
     E.v = { k, tx: r.width / 2 - (b[0] + w / 2) * k, ty: r.height / 2 + (b[1] + h / 2) * k };
   }
-  // привязка: сначала к точкам фигур, потом к сетке
-  function snap(w, skip) {
-    const tol = 9 / E.v.k; let best = null, bd = tol;
+
+  // ---------------------------------------------------------------- привязки, как в Компасе: вершина, середина, центр, квадрант, выравнивание
+  const KIND = { end: 'вершина', mid: 'середина', cen: 'центр', quad: 'квадрант' };
+  function candidates(skip) {
+    const out = []; const add = (p, k) => out.push({ p, k });
+    const segs = (P, closed) => { const n = closed ? P.length : P.length - 1; for (let i = 0; i < n; i++) { const a = P[i], b = P[(i + 1) % P.length]; add([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], 'mid'); } };
     for (const s of E.shapes) {
       if (skip && skip.has(s.id)) continue;
-      let pts;
-      if (s.type === 'circle') pts = [[s.cx, s.cy], [s.cx + s.r, s.cy], [s.cx - s.r, s.cy], [s.cx, s.cy + s.r], [s.cx, s.cy - s.r]];
-      else if (s.type === 'rect') pts = [[s.x, s.y], [s.x + s.w, s.y], [s.x + s.w, s.y + s.h], [s.x, s.y + s.h], [s.x + s.w / 2, s.y + s.h / 2], [s.x + s.w / 2, s.y], [s.x + s.w / 2, s.y + s.h], [s.x, s.y + s.h / 2], [s.x + s.w, s.y + s.h / 2]];
-      else if (s.type === 'poly') pts = s.pts;
-      else pts = s.circle ? [s.circle.c] : (s.verts || []).map(v => [v[0], v[1]]);
-      for (const p of pts) { const d = Math.hypot(p[0] - w[0], p[1] - w[1]); if (d < bd) { bd = d; best = [p[0], p[1]]; } }
+      if (s.type === 'circle' || (s.type === 'imp' && s.circle)) {
+        const c = s.type === 'circle' ? [s.cx, s.cy] : s.circle.c, r = s.type === 'circle' ? s.r : s.circle.r;
+        add(c, 'cen'); add([c[0] + r, c[1]], 'quad'); add([c[0] - r, c[1]], 'quad'); add([c[0], c[1] + r], 'quad'); add([c[0], c[1] - r], 'quad');
+      } else if (s.type === 'rect') {
+        const { x, y, w, h } = s; const r = rr(s);
+        if (r < 1e-9) for (const p of [[x, y], [x + w, y], [x + w, y + h], [x, y + h]]) add(p, 'end');
+        add([x + w / 2, y], 'mid'); add([x + w / 2, y + h], 'mid'); add([x, y + h / 2], 'mid'); add([x + w, y + h / 2], 'mid');
+        add([x + w / 2, y + h / 2], 'cen');
+      } else if (s.type === 'poly') {
+        for (const p of s.pts) add(p, 'end'); segs(s.pts, closedOf(s));
+        if (closedOf(s) && s.pts.length > 2) add(centerOf(s), 'cen');
+      } else {
+        const V = s.verts || []; for (const v of V) add([v[0], v[1]], 'end');
+        const n = s.closed ? V.length : V.length - 1;
+        for (let i = 0; i < n; i++) { const a = V[i], b = V[(i + 1) % V.length]; if (Math.abs(a[2] || 0) < 1e-9) add([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], 'mid'); }
+        if (s.closed) add(centerOf(s), 'cen');
+      }
     }
-    if (best) return best;
-    const g = E.grid > 0 ? E.grid : 0; return g ? [Math.round(w[0] / g) * g, Math.round(w[1] / g) * g] : w;
+    if (E.draft && E.draft.type === 'seg') for (const p of E.draft.pts) add(p, 'end');
+    return out;
+  }
+  const gridV = v => { const g = E.grid > 0 ? E.grid : 0; return g ? Math.round(v / g) * g : v; };
+  // {p, k: вид привязки или '', ax/ay: точки, по которым выровнялись}
+  function snap(w, skip, extra) {
+    const C = candidates(skip); if (extra) for (const p of extra) if (p) C.push({ p, k: 'end' });
+    const tol = 10 / E.v.k; let best = null, bd = tol;
+    for (const c of C) { const d = Math.hypot(c.p[0] - w[0], c.p[1] - w[1]); if (d < bd || (best && Math.abs(d - bd) < 1e-9 && c.k === 'cen')) { bd = d; best = c; } }
+    if (best) return { p: [best.p[0], best.p[1]], k: best.k };
+    const at = 7 / E.v.k; let ax = null, ay = null, dx = at, dy = at;
+    for (const c of C) {
+      const ex = Math.abs(c.p[0] - w[0]), ey = Math.abs(c.p[1] - w[1]);
+      if (ex < dx) { dx = ex; ax = c.p; } if (ey < dy) { dy = ey; ay = c.p; }
+    }
+    return { p: [ax ? ax[0] : gridV(w[0]), ay ? ay[1] : gridV(w[1])], k: '', ax, ay };
+  }
+  // точка отрезка: «Орто» держит горизонталь или вертикаль от предыдущей точки, привязки работают по свободной оси
+  function segPoint(w, from, shift) {
+    const s = snap(w, null, [from]);
+    if (!from || ortho === !!shift) return s;
+    const hz = Math.abs(w[0] - from[0]) >= Math.abs(w[1] - from[1]);
+    const i = hz ? 0 : 1; // свободная координата
+    let v, src = null;
+    if (s.k) { v = s.p[i]; src = s.p; } else if (hz ? s.ax : s.ay) { src = hz ? s.ax : s.ay; v = src[i]; } else v = gridV(w[i]);
+    const p = hz ? [v, from[1]] : [from[0], v];
+    const k = src && near(src, p, 1e-9) ? s.k : '';
+    return { p, k, ax: hz && src && !k ? src : null, ay: !hz && src && !k ? src : null };
   }
 
   // ---------------------------------------------------------------- история правок
   function commit() { E.undo.push(JSON.stringify(E.shapes)); if (E.undo.length > 60) E.undo.shift(); E.dirty = true; }
-  function undo() { const j = E.undo.pop(); if (!j) return; E.shapes = JSON.parse(j); E.sel.clear(); draw(); side(); }
+  function undo() { const j = E.undo.pop(); if (!j) return; E.shapes = JSON.parse(j); E.sel.clear(); E.draft = null; draw(); side(); }
   const newId = () => E.nextId++;
 
   // ---------------------------------------------------------------- рисование
   const pathD = P => { let d = ''; for (let i = 0; i < P.length; i++) d += (i ? 'L' : 'M') + (+P[i][0].toFixed(3)) + ' ' + (+P[i][1].toFixed(3)); return d; };
+  const sp = p => { const q = W2S(p); return [+q[0].toFixed(1), +q[1].toFixed(1)]; };
+  // подсказка у курсора: «Ширина = 81» и т.п.
+  function tipSvg(lines, W, H) {
+    if (!lines || !lines.length || !E.scur) return '';
+    const lw = Math.max(...lines.map(l => l.length)) * 7.4 + 14, lh = lines.length * 17 + 8;
+    let x = E.scur[0] + 18, y = E.scur[1] + 18; if (x + lw > W - 4) x = E.scur[0] - lw - 12; if (y + lh > H - 4) y = E.scur[1] - lh - 12;
+    return `<g class="dxtip"><rect x="${x}" y="${y}" width="${lw}" height="${lh}" rx="5"/>${lines.map((l, i) => `<text x="${x + 7}" y="${y + 17 + i * 17}">${esc(l)}</text>`).join('')}</g>`;
+  }
+  // размерная линия между точками экрана a и b, со смещением off (px) по нормали
+  function dimSvg(a, b, off, text) {
+    const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy); if (L < 2) return '';
+    const ux = dx / L, uy = dy / L, nx = -uy, ny = ux;
+    const A = [a[0] + nx * off, a[1] + ny * off], B = [b[0] + nx * off, b[1] + ny * off]; const ext = 4 * (Math.sign(off) || 1);
+    const ar = (P, k) => `M${P[0] + k * ux * 8 + nx * 3} ${P[1] + k * uy * 8 + ny * 3}L${P[0]} ${P[1]}L${P[0] + k * ux * 8 - nx * 3} ${P[1] + k * uy * 8 - ny * 3}`;
+    let ang = Math.atan2(dy, dx) * 180 / Math.PI; if (ang > 90) ang -= 180; if (ang < -90) ang += 180;
+    const mx = (A[0] + B[0]) / 2, my = (A[1] + B[1]) / 2;
+    return `<g class="dxdim"><path d="M${a[0]} ${a[1]}L${A[0] + nx * ext} ${A[1] + ny * ext}M${b[0]} ${b[1]}L${B[0] + nx * ext} ${B[1] + ny * ext}M${A[0]} ${A[1]}L${B[0]} ${B[1]}${ar(A, 1)}${ar(B, -1)}"/><text transform="translate(${mx} ${my}) rotate(${ang})" text-anchor="middle" dy="-5">${esc(text)}</text></g>`;
+  }
+  function snapSvg(s) {
+    if (!s) return '';
+    let h = '';
+    const q = sp(s.p);
+    for (const a of [s.ax, s.ay]) if (a) { const A = sp(a); h += `<path class="dxguide" d="M${A[0]} ${A[1]}L${q[0]} ${q[1]}"/><circle class="dxsnap" cx="${A[0]}" cy="${A[1]}" r="3"/>`; }
+    if (s.k === 'end') h += `<rect class="dxsnap" x="${q[0] - 5}" y="${q[1] - 5}" width="10" height="10"/>`;
+    else if (s.k === 'mid') h += `<path class="dxsnap" d="M${q[0]} ${q[1] - 6}L${q[0] + 6} ${q[1] + 5}L${q[0] - 6} ${q[1] + 5}Z"/>`;
+    else if (s.k === 'cen') h += `<circle class="dxsnap" cx="${q[0]}" cy="${q[1]}" r="6"/><path class="dxsnap" d="M${q[0] - 9} ${q[1]}H${q[0] + 9}M${q[0]} ${q[1] - 9}V${q[1] + 9}"/>`;
+    else if (s.k === 'quad') h += `<path class="dxsnap" d="M${q[0]} ${q[1] - 6}L${q[0] + 6} ${q[1]}L${q[0]} ${q[1] + 6}L${q[0] - 6} ${q[1]}Z"/>`;
+    if (s.k) h += `<text class="dxsnapt" x="${q[0] + 10}" y="${q[1] - 9}">${KIND[s.k]}</text>`;
+    return h;
+  }
+  const L2 = v => fmt(v, 2);
   function draw() {
     if (!E) return;
     const svg = $('#dxSvg'); const r = svg.getBoundingClientRect(); const v = E.v;
@@ -130,26 +203,45 @@
     let h = `<defs><pattern id="dxGrid" width="${gpx}" height="${gpx}" patternUnits="userSpaceOnUse" x="${ox}" y="${oy}"><path d="M ${gpx} 0 L 0 0 0 ${gpx}" class="dxg"/></pattern></defs><rect width="100%" height="100%" fill="url(#dxGrid)"/>`;
     h += `<line x1="0" y1="${v.ty}" x2="${r.width}" y2="${v.ty}" class="dxax"/><line x1="${v.tx}" y1="0" x2="${v.tx}" y2="${r.height}" class="dxax"/>`;
     h += `<g transform="translate(${v.tx} ${v.ty}) scale(${v.k} ${-v.k})">`;
-    if (E.under) { const u = E.under; h += `<image href="${u.src}" transform="translate(${u.x} ${u.y}) scale(${u.s} ${-u.s})" width="${u.w}" height="${u.h}" opacity="${u.op}" preserveAspectRatio="none" style="pointer-events:none"/>`; }
-    // детали: заливка наружный минус отверстия
     pieces.forEach((pc, i) => { let d = pathD(info.get(pc.outer.id).P) + 'Z'; for (const hh of pc.holes) d += pathD(info.get(hh.id).P) + 'Z'; h += `<path d="${d}" fill-rule="evenodd" class="dxfill${E.hot === i ? ' hot' : ''}"/>`; });
     for (const s of E.shapes) {
       const sel = E.sel.has(s.id), a = info.get(s.id);
       const cls = 'dxs' + (sel ? ' sel' : '') + (!closedOf(s) ? ' open' : a.depth % 2 ? ' hole' : '') + (pieceOf.get(s.id) === undefined && closedOf(s) ? ' loose' : '');
       h += `<path d="${pathD(a.P)}${closedOf(s) ? 'Z' : ''}" class="${cls}"/>`;
     }
-    if (E.draft) {
-      const d = E.draft;
-      if (d.type === 'rect') h += `<path d="${pathD(polyOf(d))}Z" class="dxs draft"/>`;
-      else if (d.type === 'circle' && d.r > 0) h += `<path d="${pathD(polyOf(d))}Z" class="dxs draft"/>`;
-      else if (d.type === 'poly') h += `<path d="${pathD(d.pts.concat(d.cur ? [d.cur] : []))}" class="dxs draft"/>`;
-      else if (d.type === 'cal' && d.a) h += `<path d="${pathD([d.a, d.cur || d.a])}" class="dxs cal"/>`;
-    }
+    const d = E.draft;
+    if (d && d.type === 'rect' && d.w > 0) h += `<path d="${pathD(polyOf(d))}Z" class="dxs draft"/>`;
+    else if (d && d.type === 'circle' && d.r > 0) h += `<path d="${pathD(polyOf(d))}Z" class="dxs draft"/>`;
+    else if (d && d.type === 'seg') h += `<path d="${pathD(d.pts.concat(d.cur ? [d.cur] : []))}" class="dxs draft"/>`;
     h += '</g>';
-    // подписи деталей и точки выбранных фигур — в экранных координатах
+    // экранный слой: номера деталей, центр под курсором, размеры, привязки, подсказка
     if (pieces.length > 1 || pieces.some(pc => (pc.outer.qty || 1) > 1)) pieces.forEach((pc, i) => { const p = W2S([pc.bb[0], pc.bb[3]]); h += `<g class="dxlab${E.hot === i ? ' hot' : ''}"><rect x="${p[0]}" y="${p[1] - 20}" width="${String(i + 1).length * 8 + (pc.outer.qty > 1 ? String(pc.outer.qty).length * 8 + 22 : 12)}" height="18" rx="4"/><text x="${p[0] + 6}" y="${p[1] - 7}">${i + 1}${pc.outer.qty > 1 ? ' × ' + pc.outer.qty : ''}</text></g>`; });
-    if (E.draft && E.draft.type === 'poly') for (const p of E.draft.pts) { const q = W2S(p); h += `<circle cx="${q[0]}" cy="${q[1]}" r="3.5" class="dxpt"/>`; }
-    if (E.snapPt) { const q = W2S(E.snapPt); h += `<circle cx="${q[0]}" cy="${q[1]}" r="5" class="dxsnap"/>`; }
+    if (E.tool !== 'sel' && E.hov) { const c = sp(centerOf(E.hov)); h += `<path class="dxcen" d="M${c[0] - 12} ${c[1]}H${c[0] + 12}M${c[0]} ${c[1] - 12}V${c[1] + 12}"/>`; }
+    let tip = null;
+    if (E.tool === 'ruler' && E.shapes.length) { // габариты всего чертежа
+      const b = bboxOf(E.shapes.flatMap(s => info.get(s.id).P));
+      h += dimSvg(sp([b[0], b[1]]), sp([b[2], b[1]]), 26, L2(b[2] - b[0])) + dimSvg(sp([b[2], b[3]]), sp([b[2], b[1]]), -26, L2(b[3] - b[1]));
+    }
+    const ms = d && d.type === 'ruler' ? (d.cur ? [d.a, d.cur] : null) : E.meas;
+    if (ms) {
+      const [a, b] = ms; const A = sp(a), B = sp(b);
+      h += `<path class="dxruler" d="M${A[0]} ${A[1]}L${B[0]} ${B[1]}"/><circle class="dxpt" cx="${A[0]}" cy="${A[1]}" r="3"/><circle class="dxpt" cx="${B[0]}" cy="${B[1]}" r="3"/>`;
+      const L = Math.hypot(b[0] - a[0], b[1] - a[1]); h += dimSvg(A, B, -14, L2(L));
+      if (d && d.type === 'ruler') tip = [`Расстояние = ${L2(L)}`, `по X = ${L2(Math.abs(b[0] - a[0]))}`, `по Y = ${L2(Math.abs(b[1] - a[1]))}`];
+    }
+    if (d && d.type === 'rect' && d.a) {
+      const b = [d.x, d.y, d.x + d.w, d.y + d.h];
+      if (d.w > 0) h += dimSvg(sp([b[0], b[3]]), sp([b[2], b[3]]), -18, L2(d.w)) + dimSvg(sp([b[2], b[3]]), sp([b[2], b[1]]), -18, L2(d.h));
+      tip = [`Ширина = ${L2(d.w)}`, `Высота = ${L2(d.h)}`];
+    }
+    if (d && d.type === 'circle' && d.a) { if (d.r > 0) { const c = sp([d.cx, d.cy]), q = sp([d.cx + d.r, d.cy]); h += `<path class="dxguide" d="M${c[0]} ${c[1]}L${q[0]} ${q[1]}"/>`; } tip = [`Диаметр = ${L2(2 * d.r)}`]; }
+    if (d && d.type === 'seg') {
+      for (const p of d.pts) { const q = sp(p); h += `<circle cx="${q[0]}" cy="${q[1]}" r="3" class="dxpt"/>`; }
+      const l = d.pts[d.pts.length - 1];
+      if (l && d.cur) { const L = Math.hypot(d.cur[0] - l[0], d.cur[1] - l[1]); let ang = Math.atan2(d.cur[1] - l[1], d.cur[0] - l[0]) * 180 / Math.PI; if (ang < 0) ang += 360; tip = [`Длина = ${L2(L)}`, `Угол = ${fmt(L > 1e-9 ? ang : 0, 1)}`]; }
+    }
+    h += snapSvg(E.snap);
+    if (!E.typing) h += tipSvg(tip, r.width, r.height);
     svg.innerHTML = h;
     const tot = E.shapes.length ? bboxOf(E.shapes.flatMap(s => info.get(s.id).P)) : null;
     $('#dxStat').textContent = (E.msg ? E.msg + '   ' : '') + (tot ? `Всё: ${fmt(tot[2] - tot[0])} × ${fmt(tot[3] - tot[1])} мм` : '') + (E.cur ? `   X ${fmt(E.cur[0])}  Y ${fmt(E.cur[1])}` : '');
@@ -170,7 +262,7 @@
       <div class="dxrow"><span class="dxl">◯</span><span class="meta">Ø</span><input type="text" inputmode="decimal" class="nm" id="dxCD" placeholder="диаметр" value="${esc(E.last.d)}"><button class="btn small" id="dxAddC">＋</button><span class="meta">${sel.length === 1 && closedOf(sel[0]) ? 'в центр выбранной' : ''}</span></div></div>`;
     if (sel.length === 1) {
       const s = sel[0], a = info.get(s.id), par = a.parent, b = a.bb;
-      h += `<div class="dxsec"><div class="t">${s.type === 'rect' ? 'Прямоугольник' : s.type === 'circle' ? 'Окружность' : 'Контур'}${a.depth % 2 ? ' — отверстие' : ''}</div><div class="dxgrid">`;
+      h += `<div class="dxsec"><div class="t">${s.type === 'rect' ? 'Прямоугольник' : s.type === 'circle' ? 'Окружность' : closedOf(s) ? 'Контур' : 'Отрезки'}${a.depth % 2 ? ' — отверстие' : ''}</div><div class="dxgrid">`;
       if (s.type === 'rect') h += fld('Ширина', 'w', fmt(s.w, 3)) + fld('Высота', 'h', fmt(s.h, 3));
       else if (s.type === 'circle') h += fld('Диаметр', 'd', fmt(2 * s.r, 3));
       else h += `<span class="meta" style="grid-column:1/-1">${fmt(b[2] - b[0])} × ${fmt(b[3] - b[1])} мм</span>`;
@@ -200,7 +292,7 @@
     commit();
     const sel = E.shapes.filter(x => E.sel.has(x.id)); const host = sel.length === 1 && closedOf(sel[0]) ? sel[0] : null;
     let c;
-    if (host) { const b = bboxOf(polyOf(host)); c = [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2]; }
+    if (host) c = centerOf(host);
     else if (E.shapes.length) { const b = bboxOf(E.shapes.flatMap(polyOf)); c = [b[2] + 20 + (s.type === 'circle' ? s.r : s.w / 2), b[1] + (s.type === 'circle' ? s.r : s.h / 2)]; }
     else c = s.type === 'circle' ? [s.r, s.r] : [s.w / 2, s.h / 2];
     if (s.type === 'circle') { s.cx = c[0]; s.cy = c[1]; } else { s.x = c[0] - s.w / 2; s.y = c[1] - s.h / 2; }
@@ -234,37 +326,107 @@
   }
   function delSel() { if (!E.sel.size) return; commit(); E.shapes = E.shapes.filter(s => !E.sel.has(s.id)); E.sel.clear(); draw(); side(); }
 
+  // ---------------------------------------------------------------- готовые фигуры
+  function putRect(d) { if (!(d.w > 1e-6 && d.h > 1e-6)) return; commit(); const s = { id: newId(), type: 'rect', x: d.x, y: d.y, w: d.w, h: d.h, r: 0 }; E.shapes.push(s); E.sel = new Set([s.id]); }
+  function putCircle(d) { if (!(d.r > 1e-6)) return; commit(); const s = { id: newId(), type: 'circle', cx: d.cx, cy: d.cy, r: d.r }; E.shapes.push(s); E.sel = new Set([s.id]); }
+  function rectFrom(a, p) { return { type: 'rect', a, x: Math.min(a[0], p[0]), y: Math.min(a[1], p[1]), w: Math.abs(p[0] - a[0]), h: Math.abs(p[1] - a[1]) }; }
+  // отрезки: цепочка; щелчок в начало — контур замкнулся; продолжение с конца уже нарисованной цепочки
+  function openEnds() { return E.shapes.filter(s => s.type === 'poly' && !closedOf(s)); }
+  function startSeg(p) {
+    const d = E.draft = { type: 'seg', pts: [p], cur: null, ext: null };
+    for (const s of openEnds()) {
+      if (near(s.pts[s.pts.length - 1], p)) { d.pts = s.pts.map(q => q.slice()); d.ext = s.id; break; }
+      if (near(s.pts[0], p)) { d.pts = s.pts.map(q => q.slice()).reverse(); d.ext = s.id; break; }
+    }
+  }
+  function addSegPt(p) {
+    const d = E.draft, l = d.pts[d.pts.length - 1];
+    if (near(l, p, 1e-6)) return;
+    if (d.pts.length >= 3 && near(d.pts[0], p, 1e-6)) { finishSeg(true); return; }
+    d.pts.push(p);
+  }
+  function finishSeg(close) {
+    const d = E.draft; E.draft = null; if (!d || d.type !== 'seg') return;
+    let pts = d.pts; let drop = new Set(d.ext ? [d.ext] : []);
+    if (!close) { // конец лёг на конец другой цепочки — склеиваем
+      for (const s of openEnds()) {
+        if (drop.has(s.id)) continue; const l = pts[pts.length - 1];
+        if (near(s.pts[0], l)) { pts = pts.concat(s.pts.slice(1)); drop.add(s.id); break; }
+        if (near(s.pts[s.pts.length - 1], l)) { pts = pts.concat(s.pts.slice(0, -1).reverse()); drop.add(s.id); break; }
+      }
+      if (pts.length >= 4 && near(pts[0], pts[pts.length - 1])) { pts = pts.slice(0, -1); close = true; }
+    }
+    if (pts.length < 2 || (d.ext && pts.length === E.shapes.find(s => s.id === d.ext).pts.length && !close)) { draw(); side(); return; }
+    commit();
+    E.shapes = E.shapes.filter(s => !drop.has(s.id));
+    const s = { id: newId(), type: 'poly', pts, closed: !!close }; E.shapes.push(s); E.sel = new Set([s.id]);
+    draw(); side();
+  }
+
+  // ---------------------------------------------------------------- ввод размера с клавиатуры (как в Компасе: начал рисовать — набрал число — Enter)
+  function showIn(ch) {
+    const inp = $('#dxIn'); E.typing = true;
+    const q = E.scur || [100, 100]; inp.style.left = Math.max(4, q[0] + 16) + 'px'; inp.style.top = Math.max(4, q[1] + 16) + 'px';
+    const d = E.draft; inp.placeholder = d.type === 'rect' ? 'ширина высота' : d.type === 'circle' ? 'диаметр' : 'длина  угол';
+    inp.hidden = false; inp.value = ch; inp.focus(); draw();
+  }
+  function hideIn() { const inp = $('#dxIn'); inp.hidden = true; inp.value = ''; if (E) { E.typing = false; draw(); } }
+  function applyIn() {
+    const n = $('#dxIn').value.replace(/,/g, '.').split(/[\s*xхX×;]+/).filter(Boolean).map(Number).filter(isFinite);
+    hideIn(); const d = E.draft; if (!d || !n.length) return;
+    if (d.type === 'rect') {
+      const c = E.cur || [d.a[0] + 1, d.a[1] + 1]; const sx = c[0] < d.a[0] ? -1 : 1, sy = c[1] < d.a[1] ? -1 : 1;
+      const w = Math.abs(n[0]), h = n.length > 1 ? Math.abs(n[1]) : (d.h > 0 ? d.h : w);
+      putRect(rectFrom(d.a, [d.a[0] + sx * w, d.a[1] + sy * h])); E.draft = null; draw(); side(); return;
+    }
+    if (d.type === 'circle') { putCircle({ cx: d.a[0], cy: d.a[1], r: Math.abs(n[0]) / 2 }); E.draft = null; draw(); side(); return; }
+    if (d.type === 'seg') {
+      const l = d.pts[d.pts.length - 1]; let ang;
+      if (n.length > 1) ang = n[1] * Math.PI / 180;
+      else { const c = d.cur || [l[0] + 1, l[1]]; ang = Math.hypot(c[0] - l[0], c[1] - l[1]) > 1e-9 ? Math.atan2(c[1] - l[1], c[0] - l[0]) : 0; }
+      const L = n[0]; const p = [l[0] + L * Math.cos(ang), l[1] + L * Math.sin(ang)].map(v => Math.round(v * 1e6) / 1e6);
+      addSegPt(p); if (E.draft) E.draft.cur = p; draw(); side();
+    }
+  }
+
   // ---------------------------------------------------------------- мышь и клавиши
-  function hit(w) {
+  function hit(w, closedOnly) {
     const tol = 7 / E.v.k; let best = null, ba = Infinity;
-    for (const s of E.shapes) { if (outlineDist(w, s) <= tol) { const a = closedOf(s) ? areaOf(polyOf(s)) : 0; if (a < ba) { ba = a; best = s; } } }
+    for (const s of E.shapes) { if (closedOnly && !closedOf(s)) continue; if (outlineDist(w, s) <= tol) { const a = closedOf(s) ? areaOf(polyOf(s)) : 0; if (a < ba) { ba = a; best = s; } } }
     if (best) return best;
     for (const s of E.shapes) { if (!closedOf(s)) continue; const P = polyOf(s); if (inside(w, P)) { const a = areaOf(P); if (a < ba) { ba = a; best = s; } } }
     return best;
   }
   let drag = null;
+  function toolPoint(w, e) {
+    const d = E.draft;
+    if (E.tool === 'seg' && d && d.type === 'seg') return segPoint(w, d.pts[d.pts.length - 1], e.shiftKey);
+    return snap(w);
+  }
   function onDown(e) {
-    if (!E) return; const [sx, sy] = evPt(e); const w = S2W(sx, sy);
-    if (e.button === 1 || e.button === 2 || e.altKey) { drag = { pan: true, sx, sy, tx: E.v.tx, ty: E.v.ty }; e.preventDefault(); return; }
+    if (!E) return; if (E.typing) hideIn();
+    const [sx, sy] = evPt(e); const w = S2W(sx, sy);
+    if (e.button === 1 || (e.button === 2 && E.tool === 'sel') || e.altKey) { drag = { pan: true, sx, sy, tx: E.v.tx, ty: E.v.ty }; e.preventDefault(); return; }
+    if (e.button === 2) { // правая кнопка в инструменте: закончить
+      e.preventDefault();
+      if (E.draft && E.draft.type === 'seg') finishSeg(false); else if (E.draft) { E.draft = null; draw(); } else setTool('sel');
+      return;
+    }
     if (e.button !== 0) return;
     e.preventDefault(); if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
-    const p = snap(w);
-    if (E.tool === 'rect') { drag = { rect: true, a: p }; E.draft = { type: 'rect', x: p[0], y: p[1], w: 0, h: 0 }; return; }
-    if (E.tool === 'circle') { drag = { circle: true, a: p }; E.draft = { type: 'circle', cx: p[0], cy: p[1], r: 0 }; return; }
-    if (E.tool === 'poly') {
-      const d = E.draft && E.draft.type === 'poly' ? E.draft : (E.draft = { type: 'poly', pts: [] });
-      let q = p; if (e.shiftKey && d.pts.length) q = ortho(d.pts[d.pts.length - 1], p);
-      if (d.pts.length >= 3 && Math.hypot(q[0] - d.pts[0][0], q[1] - d.pts[0][1]) * E.v.k < 10) { finishPoly(); return; }
-      const l = d.pts[d.pts.length - 1]; if (!l || Math.hypot(q[0] - l[0], q[1] - l[1]) > 1e-6) d.pts.push(q);
-      draw(); return;
+    const s0 = toolPoint(w, e), p = s0.p, d = E.draft;
+    if (E.tool === 'rect') {
+      if (d && d.type === 'rect') { putRect(rectFrom(d.a, p)); E.draft = null; draw(); side(); return; }
+      E.draft = rectFrom(p, p); drag = { shape: true, sx, sy }; draw(); return;
     }
-    if (E.tool === 'cal') {
-      const d = E.draft && E.draft.type === 'cal' ? E.draft : (E.draft = { type: 'cal' });
-      if (!d.a) { d.a = w; draw(); return; }
-      const dist = Math.hypot(w[0] - d.a[0], w[1] - d.a[1]); E.draft = null;
-      const real = num(prompt('Сколько это в мм?', ''));
-      if (real > 0 && dist > 1e-6 && E.under) { const f = real / dist, u = E.under; u.x = d.a[0] - (d.a[0] - u.x) * f; u.y = d.a[1] - (d.a[1] - u.y) * f; u.s *= f; fit(); }
-      setTool('sel'); return;
+    if (E.tool === 'circle') {
+      if (d && d.type === 'circle') { putCircle({ cx: d.a[0], cy: d.a[1], r: Math.hypot(p[0] - d.a[0], p[1] - d.a[1]) }); E.draft = null; draw(); side(); return; }
+      E.draft = { type: 'circle', a: p, cx: p[0], cy: p[1], r: 0 }; drag = { shape: true, sx, sy }; draw(); return;
+    }
+    if (E.tool === 'seg') { if (d && d.type === 'seg') addSegPt(p); else startSeg(p); if (E.draft) E.draft.cur = p; draw(); return; }
+    if (E.tool === 'ruler') {
+      if (d && d.type === 'ruler') { E.meas = [d.a, p]; E.draft = null; draw(); return; }
+      E.meas = null; E.draft = { type: 'ruler', a: p, cur: p }; draw(); return;
     }
     // выбор / перенос
     const s = hit(w);
@@ -277,65 +439,106 @@
     drag = { move: true, w0: w, ref: refOf(s), mv, base: null, moved: false };
     draw(); side();
   }
-  function ortho(a, p) { return Math.abs(p[0] - a[0]) >= Math.abs(p[1] - a[1]) ? [p[0], a[1]] : [a[0], p[1]]; }
   function onMove(e) {
     if (!E) return; const svg = $('#dxSvg'); if (!svg) return;
-    const [sx, sy] = evPt(e); const w = S2W(sx, sy); E.cur = w; E.msg = '';
+    const [sx, sy] = evPt(e); const w = S2W(sx, sy); E.cur = w; E.scur = [sx, sy]; E.msg = '';
     if (drag && drag.pan) { E.v.tx = drag.tx + sx - drag.sx; E.v.ty = drag.ty + sy - drag.sy; if (Math.hypot(sx - drag.sx, sy - drag.sy) > 3) drag.clear = false; draw(); return; }
-    if (drag && drag.rect) { const p = snap(w); const a = drag.a; E.draft = { type: 'rect', x: Math.min(a[0], p[0]), y: Math.min(a[1], p[1]), w: Math.abs(p[0] - a[0]), h: Math.abs(p[1] - a[1]) }; E.msg = `${fmt(E.draft.w)} × ${fmt(E.draft.h)} мм`; draw(); return; }
-    if (drag && drag.circle) { const p = snap(w); E.draft.r = Math.hypot(p[0] - drag.a[0], p[1] - drag.a[1]); E.msg = `Ø ${fmt(2 * E.draft.r)} мм`; draw(); return; }
     if (drag && drag.move) {
       if (!drag.moved) { if (Math.hypot(w[0] - drag.w0[0], w[1] - drag.w0[1]) * E.v.k < 4) return; drag.moved = true; commit(); drag.base = JSON.stringify(E.shapes); }
       // опорная точка фигуры ложится на привязку
-      const target = snap([drag.ref[0] + w[0] - drag.w0[0], drag.ref[1] + w[1] - drag.w0[1]], drag.mv);
-      const dx = target[0] - drag.ref[0], dy = target[1] - drag.ref[1];
-      E.shapes = JSON.parse(drag.base); for (const s of E.shapes) if (drag.mv.has(s.id)) moveShape(s, dx, dy);
+      const s = snap([drag.ref[0] + w[0] - drag.w0[0], drag.ref[1] + w[1] - drag.w0[1]], drag.mv); E.snap = s;
+      const dx = s.p[0] - drag.ref[0], dy = s.p[1] - drag.ref[1];
+      E.shapes = JSON.parse(drag.base); for (const x of E.shapes) if (drag.mv.has(x.id)) moveShape(x, dx, dy);
       draw(); return;
     }
-    if (E.tool === 'poly' && E.draft && E.draft.type === 'poly') { let p = snap(w); const l = E.draft.pts[E.draft.pts.length - 1]; if (e.shiftKey && l) p = ortho(l, p); E.draft.cur = p; if (l) E.msg = `отрезок ${fmt(Math.hypot(p[0] - l[0], p[1] - l[1]))} мм`; E.snapPt = p; draw(); return; }
-    if (E.tool === 'cal' && E.draft && E.draft.a) { E.draft.cur = w; draw(); return; }
-    E.snapPt = E.tool !== 'sel' && E.tool !== 'cal' ? snap(w) : null;
+    if (E.tool === 'sel') { E.snap = null; E.hov = null; draw(); return; }
+    if (E.typing) return; // пока вводится число — картинка стоит
+    const s = toolPoint(w, e); const p = s.p; E.snap = s; const d = E.draft;
+    E.hov = hit(w, true);
+    if (d && d.type === 'rect') Object.assign(d, rectFrom(d.a, p));
+    else if (d && d.type === 'circle') d.r = Math.hypot(p[0] - d.a[0], p[1] - d.a[1]);
+    else if (d && (d.type === 'seg' || d.type === 'ruler')) d.cur = p;
     draw();
   }
-  function onUp() {
+  function onUp(e) {
     if (!E || !drag) return; const d = drag; drag = null;
-    if (d.rect) { const r = E.draft; E.draft = null; if (r && r.w > 1e-6 && r.h > 1e-6) { commit(); r.id = newId(); r.r = 0; E.shapes.push(r); E.sel = new Set([r.id]); setTool('sel'); } draw(); side(); return; }
-    if (d.circle) { const c = E.draft; E.draft = null; if (c && c.r > 1e-6) { commit(); c.id = newId(); E.shapes.push(c); E.sel = new Set([c.id]); setTool('sel'); } draw(); side(); return; }
-    if (d.move) { draw(); side(); return; }
+    if (d.shape) { // протянул — фигура готова; просто щёлкнул — ждём второй щелчок
+      const q = e ? evPt(e) : [d.sx, d.sy];
+      if (Math.hypot(q[0] - d.sx, q[1] - d.sy) > 4 && E.draft) { if (E.draft.type === 'rect') putRect(E.draft); else putCircle(E.draft); E.draft = null; draw(); side(); }
+      return;
+    }
+    if (d.move) { E.snap = null; draw(); side(); return; }
     if (d.pan && d.clear) { draw(); side(); }
   }
-  function finishPoly() { const d = E.draft; E.draft = null; E.snapPt = null; if (d && d.pts.length >= 3) { commit(); const s = { id: newId(), type: 'poly', pts: d.pts }; E.shapes.push(s); E.sel = new Set([s.id]); } setTool('sel'); side(); }
   function onWheel(e) { if (!E) return; e.preventDefault(); const [sx, sy] = evPt(e); const w = S2W(sx, sy); const f = e.deltaY < 0 ? 1.2 : 1 / 1.2; E.v.k = Math.max(0.01, Math.min(400, E.v.k * f)); E.v.tx = sx - w[0] * E.v.k; E.v.ty = sy + w[1] * E.v.k; draw(); }
   function onKey(e) {
     if (!E || $('#dxm').hidden) return;
+    if (e.target && e.target.id === 'dxIn') {
+      if (e.key === 'Enter') { e.preventDefault(); applyIn(); } else if (e.key === 'Escape') hideIn();
+      e.stopPropagation(); return;
+    }
     const inInput = /^(INPUT|SELECT|TEXTAREA)$/.test((e.target && e.target.tagName) || '');
-    if (e.key === 'Escape') { if (E.draft) { E.draft = null; E.snapPt = null; setTool('sel'); } else if (inInput) e.target.blur(); else if (E.sel.size) { E.sel.clear(); draw(); side(); } e.stopPropagation(); return; }
+    if (e.key === 'Escape') {
+      if (inInput) e.target.blur();
+      else if (E.draft) { if (E.draft.type === 'seg') finishSeg(false); else { E.draft = null; draw(); } }
+      else if (E.meas) { E.meas = null; draw(); }
+      else if (E.tool !== 'sel') setTool('sel');
+      else if (E.sel.size) { E.sel.clear(); draw(); side(); }
+      e.stopPropagation(); return;
+    }
     if (inInput) { if (e.key === 'Enter') e.target.blur(); return; }
-    if (e.key === 'Enter' && E.draft && E.draft.type === 'poly') { finishPoly(); return; }
+    if (e.key === 'F8') { e.preventDefault(); setOrtho(!ortho); return; }
+    if (E.draft && E.draft.type !== 'ruler' && /^[0-9.,-]$/.test(e.key) && !e.ctrlKey && !e.metaKey) { e.preventDefault(); showIn(e.key); return; }
+    if (e.key === 'Enter' && E.draft && E.draft.type === 'seg') { finishSeg(false); return; }
     if (e.key === 'Delete' || e.key === 'Backspace') { delSel(); e.preventDefault(); return; }
-    if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'я')) { undo(); e.preventDefault(); return; }
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'я' || e.code === 'KeyZ')) { undo(); e.preventDefault(); return; }
     const mv = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] }[e.key];
     if (mv && E.sel.size) { commit(); const g = E.grid > 0 ? E.grid : 1; for (const s of E.shapes) if (E.sel.has(s.id)) moveShape(s, mv[0] * g, mv[1] * g); draw(); side(); e.preventDefault(); }
   }
-  function setTool(t) { E.tool = t; E.draft = null; E.snapPt = null; document.querySelectorAll('#dxTools [data-tool]').forEach(b => b.classList.toggle('on', b.dataset.tool === t)); $('#dxSvg').classList.toggle('drawing', t !== 'sel'); draw(); }
+  function setTool(t) {
+    if (E.draft && E.draft.type === 'seg') finishSeg(false);
+    E.tool = t; E.draft = null; E.snap = null; E.hov = null; if (t !== 'ruler') E.meas = null; if (E.typing) hideIn();
+    document.querySelectorAll('#dxTools [data-tool]').forEach(b => b.classList.toggle('on', b.dataset.tool === t));
+    $('#dxSvg').classList.toggle('drawing', t !== 'sel'); draw();
+  }
+  function setOrtho(v) { ortho = v; $('#dxOrtho').classList.toggle('on', ortho); if (E) draw(); }
 
-  // ---------------------------------------------------------------- подложка: фото, скан, PDF
+  // ---------------------------------------------------------------- чертёж (фото, скан, PDF) — сбоку, рисуем рядом
   async function underFromFile(f) {
     const name = f.name || ''; const e = (name.split('.').pop() || '').toLowerCase();
     let bytes = new Uint8Array(await f.arrayBuffer());
     if (/^(pdf|tif|tiff)$/.test(e)) {
       if (e !== 'pdf') bytes = Media.tiffToPdf(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
       const doc = await window.__pdf.open(bytes); const page = await doc.getPage(1);
-      const v1 = page.getViewport({ scale: 1 }); const k = Math.min(150 / 72, 3000 / Math.max(v1.width, v1.height)); const vp = page.getViewport({ scale: k });
+      const v1 = page.getViewport({ scale: 1 }); const k = Math.min(200 / 72, 4000 / Math.max(v1.width, v1.height)); const vp = page.getViewport({ scale: k });
       const c = document.createElement('canvas'); c.width = Math.ceil(vp.width); c.height = Math.ceil(vp.height);
       const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); await page.render({ canvasContext: g, viewport: vp }).promise;
-      return { src: c.toDataURL('image/jpeg', 0.85), w: c.width, h: c.height, mm: 25.4 / (72 * k) };
+      return { src: c.toDataURL('image/jpeg', 0.88), w: c.width, h: c.height };
     }
     const url = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(new Error('Не удалось прочитать файл')); r.readAsDataURL(new Blob([bytes], { type: e === 'png' ? 'image/png' : e === 'bmp' ? 'image/bmp' : 'image/jpeg' })); });
     const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('Это не картинка')); i.src = url; });
-    return { src: url, w: img.naturalWidth, h: img.naturalHeight, mm: 400 / Math.max(img.naturalWidth, img.naturalHeight) }; // размер неизвестен — задаётся по двум точкам
+    return { src: url, w: img.naturalWidth, h: img.naturalHeight };
   }
-  function setUnder(u) { E.under = u ? { src: u.src, w: u.w, h: u.h, s: u.mm, x: 0, y: u.h * u.mm, op: +$('#dxOp').value || 0.5 } : null; $('#dxUnderBox').hidden = !E.under; if (E.under) fit(); draw(); }
+  function skApply() { if (!E || !E.sk) return; const v = E.sk.v; $('#dxSkImg').style.transform = `translate(${v.tx}px,${v.ty}px) scale(${v.k})`; }
+  function skFit() {
+    if (!E || !E.sk) return; const r = $('#dxSk').getBoundingClientRect(); const u = E.sk;
+    const k = Math.min((r.width - 16) / u.w, (r.height - 16) / u.h) || 1;
+    u.v = { k, tx: (r.width - u.w * k) / 2, ty: (r.height - u.h * k) / 2 }; skApply();
+  }
+  function setUnder(u) {
+    E.sk = u ? { src: u.src, w: u.w, h: u.h, v: { k: 1, tx: 0, ty: 0 } } : null;
+    $('#dxSk').hidden = !E.sk; $('#dxSkImg').src = E.sk ? E.sk.src : '';
+    requestAnimationFrame(() => { if (!E) return; skFit(); fit(); draw(); });
+  }
+  let skDrag = null;
+  function skInit() {
+    const box = $('#dxSk');
+    box.addEventListener('wheel', e => { if (!E || !E.sk) return; e.preventDefault(); const r = box.getBoundingClientRect(); const x = e.clientX - r.left, y = e.clientY - r.top; const v = E.sk.v; const f = e.deltaY < 0 ? 1.2 : 1 / 1.2; const k = Math.max(0.02, Math.min(20, v.k * f)); v.tx = x - (x - v.tx) * k / v.k; v.ty = y - (y - v.ty) * k / v.k; v.k = k; skApply(); }, { passive: false });
+    box.addEventListener('mousedown', e => { if (!E || !E.sk || e.target.closest('button')) return; e.preventDefault(); skDrag = { x: e.clientX, y: e.clientY, tx: E.sk.v.tx, ty: E.sk.v.ty }; box.classList.add('grab'); });
+    window.addEventListener('mousemove', e => { if (!skDrag || !E || !E.sk) return; E.sk.v.tx = skDrag.tx + e.clientX - skDrag.x; E.sk.v.ty = skDrag.ty + e.clientY - skDrag.y; skApply(); });
+    window.addEventListener('mouseup', () => { skDrag = null; box.classList.remove('grab'); });
+    box.addEventListener('dblclick', skFit);
+  }
 
   // ---------------------------------------------------------------- вход и выход
   function importContour(c) {
@@ -347,14 +550,14 @@
     }
     return { type: 'imp', closed: !!c.closed, verts: V ? V.map(v => [v[0], v[1], v[2] || 0]) : null, poly: c.poly.map(p => [p[0], p[1]]) };
   }
-  // opt: {name, contours, origin:{id}, under:{src,w,h,mm}, file}
+  // opt: {name, contours, origin:{id}, qty, under:{src,w,h}, file, onClose}
   async function open(opt) {
     opt = opt || {};
-    E = { shapes: [], sel: new Set(), tool: 'sel', v: { k: 1, tx: 0, ty: 0 }, grid: 1, under: null, nextId: 1, undo: [], name: opt.name || 'Деталь', origin: opt.origin || null, last: lastIn, draft: null, dirty: false, saved: '', onClose: opt.onClose || null, hot: null };
+    E = { shapes: [], sel: new Set(), tool: 'sel', v: { k: 1, tx: 0, ty: 0 }, grid: 1, sk: null, nextId: 1, undo: [], name: opt.name || 'Деталь', origin: opt.origin || null, last: lastIn, draft: null, dirty: false, saved: '', onClose: opt.onClose || null, hot: null, snap: null, hov: null, meas: null, typing: false };
     for (const c of opt.contours || []) { const s = importContour(c); s.id = newId(); E.shapes.push(s); }
     if (opt.qty > 1) { const s0 = structure(); if (s0.pieces.length === 1) s0.pieces[0].outer.qty = opt.qty; }
-    $('#dxName').value = E.name; $('#dxGridIn').value = '1'; $('#dxOp').value = '0.5'; $('#dxUnderBox').hidden = true;
-    $('#dxm').hidden = false;
+    $('#dxName').value = E.name; $('#dxGridIn').value = '1'; $('#dxSk').hidden = true; $('#dxIn').hidden = true;
+    $('#dxm').hidden = false; setOrtho(ortho);
     fit(); setTool('sel'); side();
     if (opt.under) setUnder(opt.under);
     else if (opt.file) { try { setUnder(await underFromFile(opt.file)); } catch (err) { alert(err.message); } }
@@ -362,11 +565,12 @@
   function close(force) {
     if (!E) return;
     if (!force && E.dirty && E.shapes.length && !confirm('Закрыть редактор? Нарисованное не сохранится.')) return;
-    lastIn = E.last; const cb = E.onClose; $('#dxm').hidden = true; E = null; drag = null;
+    lastIn = E.last; const cb = E.onClose; $('#dxm').hidden = true; $('#dxSkImg').src = ''; E = null; drag = null;
     if (cb) setTimeout(cb, 0);
   }
   const allBytes = shapes => new TextEncoder().encode(DC.writeDXF(shapes.map(contourOf)));
   function done() {
+    if (E.draft && E.draft.type === 'seg') finishSeg(false);
     const { pieces } = structure(); if (!pieces.length) return;
     E.name = $('#dxName').value.trim() || 'Деталь';
     const list = pieces.map((pc, i) => ({ name: pieceName(pc, i, pieces.length), bytes: allBytes(pieceShapes(pc)), qty: pc.outer.qty || 1 }));
@@ -375,6 +579,7 @@
     close(true);
   }
   async function saveDxf() {
+    if (E.draft && E.draft.type === 'seg') finishSeg(false);
     if (!E.shapes.length) return;
     const name = ($('#dxName').value.trim() || 'Деталь') + '.dxf'; const bytes = allBytes(E.shapes);
     if (window.Paths && Paths.api) {
@@ -389,10 +594,12 @@
   function init() {
     const svg = $('#dxSvg'); if (!svg) return;
     svg.addEventListener('mousedown', onDown); window.addEventListener('mousemove', e => { if (E && !$('#dxm').hidden && (drag || e.target.closest('#dxSvg'))) onMove(e); }); window.addEventListener('mouseup', onUp);
+    svg.addEventListener('mouseleave', () => { if (E && !drag && !E.typing) { E.snap = null; E.scur = null; draw(); } });
     svg.addEventListener('wheel', onWheel, { passive: false }); svg.addEventListener('contextmenu', e => e.preventDefault());
-    svg.addEventListener('dblclick', () => { if (E && E.draft && E.draft.type === 'poly') finishPoly(); });
+    svg.addEventListener('dblclick', () => { if (E && E.draft && E.draft.type === 'seg') finishSeg(false); });
     document.addEventListener('keydown', onKey, true);
     $('#dxTools').addEventListener('click', e => { const b = e.target.closest('[data-tool]'); if (b && E) setTool(b.dataset.tool); });
+    $('#dxOrtho').addEventListener('click', () => setOrtho(!ortho));
     $('#dxSide').addEventListener('click', onSideClick); $('#dxSide').addEventListener('change', onSideChange);
     $('#dxSide').addEventListener('mouseover', e => { const pc = e.target.closest('[data-pc]'); const i = pc ? +pc.dataset.pc : null; if (E && E.hot !== i) { E.hot = i; draw(); } });
     $('#dxSide').addEventListener('mouseleave', () => { if (E && E.hot !== null) { E.hot = null; draw(); } });
@@ -403,18 +610,19 @@
     $('#dxDone').addEventListener('click', done);
     $('#dxSave').addEventListener('click', saveDxf);
     $('#dxName').addEventListener('change', e => { E.name = e.target.value.trim() || 'Деталь'; side(); });
+    $('#dxIn').addEventListener('blur', () => { if (E && E.typing) setTimeout(() => { if (E && E.typing && document.activeElement !== $('#dxIn')) hideIn(); }, 150); });
     $('#dxUnder').addEventListener('click', async () => {
       if (window.Paths && Paths.api) { const ps = await Paths.pick('pdf'); if (!ps.length) return; try { const b = await Paths.read(ps[0].path); setUnder(await underFromFile(new File([b], ps[0].name))); } catch (err) { alert(err.message); } }
       else $('#dxUnderFile').click();
     });
     $('#dxUnderFile').addEventListener('change', async e => { const f = e.target.files[0]; e.target.value = ''; if (!f) return; try { setUnder(await underFromFile(f)); } catch (err) { alert(err.message); } });
-    $('#dxOp').addEventListener('input', e => { if (E && E.under) { E.under.op = +e.target.value; draw(); } });
     $('#dxUnderDel').addEventListener('click', () => setUnder(null));
-    window.addEventListener('resize', () => { if (E && !$('#dxm').hidden) draw(); });
-    // перетаскивание файла в редактор: картинка/PDF — подложка
-    svg.addEventListener('dragover', e => e.preventDefault());
-    svg.addEventListener('drop', async e => { e.preventDefault(); e.stopPropagation(); const f = e.dataTransfer.files[0]; if (!f || !E) return; if (/\.(pdf|tiff?|jpe?g|png|bmp)$/i.test(f.name)) { try { setUnder(await underFromFile(f)); } catch (err) { alert(err.message); } } });
+    skInit();
+    window.addEventListener('resize', () => { if (E && !$('#dxm').hidden) { skFit(); draw(); } });
+    // перетаскивание файла в редактор: картинка/PDF — чертёж сбоку
+    const drop = async e => { e.preventDefault(); e.stopPropagation(); const f = e.dataTransfer.files[0]; if (!f || !E) return; if (/\.(pdf|tiff?|jpe?g|png|bmp)$/i.test(f.name)) { try { setUnder(await underFromFile(f)); } catch (err) { alert(err.message); } } };
+    for (const el of [svg, $('#dxSk')]) { el.addEventListener('dragover', e => e.preventDefault()); el.addEventListener('drop', drop); }
   }
   init();
-  window.__dxfedit = { open, close, underFromFile, get state() { return E; }, _int: { structure, contourOf, polyOf, importContour } };
+  window.__dxfedit = { open, close, underFromFile, get state() { return E; }, _int: { structure, contourOf, polyOf, importContour, snap, segPoint } };
 })();
