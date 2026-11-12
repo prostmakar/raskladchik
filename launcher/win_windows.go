@@ -187,7 +187,7 @@ func tubestRunning() bool {
 // без клавиатуры и без фокуса), в окне сохранения имя пишется прямо в поле и жмётся «Сохранить». Потом TubesT закрывается.
 const tubestPS = `
 $ErrorActionPreference='Stop'
-trap { Write-Output ('ERR:' + $_.Exception.Message); exit 1 }
+trap { try { Add-Content -LiteralPath (Join-Path $env:TEMP 'Raskladchik_tubest.log') -Value ('ERR ' + $_.Exception.Message) -Encoding UTF8 } catch {}; Write-Output ('ERR:' + $_.Exception.Message); exit 1 }
 Add-Type -TypeDefinition @"
 using System; using System.Runtime.InteropServices; using System.Text; using System.Collections.Generic;
 public class TW {
@@ -242,7 +242,11 @@ public class TW {
   }
 }
 "@
+Add-Type -AssemblyName UIAutomationClient,UIAutomationTypes
 $src = __SRC__; $exe = __EXE__
+$logf = Join-Path $env:TEMP 'Raskladchik_tubest.log'
+function L($m) { try { Add-Content -LiteralPath $logf -Value ((Get-Date).ToString('HH:mm:ss.fff') + ' ' + $m) -Encoding UTF8 } catch {} }
+L ('=== ' + $src)
 $dst = [IO.Path]::ChangeExtension($src, '.zzx')
 $name = [IO.Path]::GetFileName($src)
 $user = [TW]::GetForegroundWindow()
@@ -270,30 +274,49 @@ try {
   Start-Sleep -Milliseconds 500
   # кнопка Export: группа «Locating the file», вторая кнопка
   $grp = $null; foreach ($k in [TW]::Kids($mh)) { if ($k[2] -eq 'TdxRibbonGroupBarControl' -and $k[1] -eq 'Locating the file') { $grp = [IntPtr]$k[0] } }
-  if (-not $grp) { throw 'не нашёл кнопку Export' }
-  $save = $null
-  for ($try = 0; $try -lt 3 -and -not $save; $try++) {
-    [TW]::Click($grp, 70, 36)
+  if (-not $grp) { L ('kids: ' + (([TW]::Kids($mh) | ForEach-Object { $_[2] + ':' + $_[1] }) -join '; ')); throw 'не нашёл кнопку Export' }
+  $r = New-Object TW+RECT; [void][TW]::GetWindowRect($grp, [ref]$r); L ('loaded; group ' + $r.L + ',' + $r.T + ' ' + ($r.R - $r.L) + 'x' + ($r.B - $r.T))
+  $save = $null; $mainH = $mh
+  foreach ($pt in @(@(70, 36), @(70, 30), @(72, 44), @(70, 36))) {
+    if ($save) { break }
+    [TW]::Click($grp, $pt[0], $pt[1]); L ('click ' + $pt[0] + ',' + $pt[1])
     $t0 = Get-Date
-    while (-not $save -and ((Get-Date) - $t0).TotalSeconds -lt 8) { Start-Sleep -Milliseconds 200; $save = Win { param($w) $w[2] -eq '#32770' } }
+    while (-not $save -and ((Get-Date) - $t0).TotalSeconds -lt 6) { Start-Sleep -Milliseconds 200; $save = Win { param($w) [IntPtr]$w[0] -ne $mainH -and $w[2] -ne 'TApplication' } }
   }
+  L ('windows: ' + (([TW]::Wins($pid0) | ForEach-Object { $_[2] + ':' + $_[1] }) -join '; '))
   if (-not $save) { throw 'не открылось окно сохранения' }
   $sh = [IntPtr]$save[0]; [TW]::SetWindowPos($sh, [IntPtr]1, -20000, -20000, 0, 0, 0x15) | Out-Null; [TW]::Focus($user, $pid0)
-  # поле имени файла: Edit (в старом окне — внутри ComboBox 1148, в новом — Edit 1001)
-  $kids = [TW]::Kids($sh); $edit = $null
-  foreach ($k in $kids) { if ($k[2] -eq 'Edit' -and ($k[3] -eq 1001 -or $k[3] -eq 1148 -or $k[3] -eq 1152)) { $edit = [IntPtr]$k[0] } }
-  if (-not $edit) { foreach ($k in $kids) { if ($k[2] -eq 'Edit') { $edit = [IntPtr]$k[0]; break } } }
+  Start-Sleep -Milliseconds 400
+  # поле имени файла: через UI Automation (подходит и старому, и новому окну сохранения)
+  $ae = [Windows.Automation.AutomationElement]::FromHandle($sh)
+  $edits = $ae.FindAll([Windows.Automation.TreeScope]::Descendants, (New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::ControlTypeProperty, [Windows.Automation.ControlType]::Edit)))
+  L ('edits: ' + (($edits | ForEach-Object { $_.Current.AutomationId + '=' + $_.Current.Name }) -join '; '))
+  $edit = $null
+  foreach ($e in $edits) { if ($e.Current.AutomationId -eq '1001') { $edit = $e } }
+  if (-not $edit) { foreach ($e in $edits) { if ($e.Current.AutomationId -eq '1148' -or $e.Current.AutomationId -eq '1152') { $edit = $e } } }
+  if (-not $edit -and $edits.Count) { $edit = $edits[0] }
   if (-not $edit) { throw 'нет поля имени файла' }
-  [TW]::SendMessage($edit, 0x0C, [IntPtr]::Zero, $dst) | Out-Null
-  Start-Sleep -Milliseconds 200
-  [TW]::PostMessage($sh, 0x111, [IntPtr]1, [IntPtr]::Zero) | Out-Null   # WM_COMMAND IDOK = «Сохранить»
-  # ждём файл
-  $t0 = Get-Date; $prev = -1
+  $ok = $false
+  try { $edit.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern).SetValue($dst); $ok = $true } catch { L ('SetValue: ' + $_.Exception.Message) }
+  if (-not $ok) { [TW]::SendMessage([IntPtr]$edit.Current.NativeWindowHandle, 0x0C, [IntPtr]::Zero, $dst) | Out-Null }
+  Start-Sleep -Milliseconds 300
+  try { L ('value: ' + $edit.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern).Current.Value) } catch {}
+  $btn = $ae.FindFirst([Windows.Automation.TreeScope]::Descendants, (New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::AutomationIdProperty, '1')))
+  if ($btn) { try { $btn.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke(); L 'invoke save' } catch { L ('invoke: ' + $_.Exception.Message); [TW]::PostMessage($sh, 0x111, [IntPtr]1, [IntPtr]::Zero) | Out-Null } }
+  else { [TW]::PostMessage($sh, 0x111, [IntPtr]1, [IntPtr]::Zero) | Out-Null; L 'IDOK' }
+  # ждём файл; если TubesT сохранила в свою папку (заголовок окна стал *.zzx) — найдём и перенесём к .igs
+  $t0 = Get-Date; $prev = -1; $zname = [IO.Path]::GetFileName($dst); $start = $p.StartTime
   while ($true) { Start-Sleep -Milliseconds 500
-    if (Test-Path -LiteralPath $dst) { $len = (Get-Item -LiteralPath $dst).Length; if ($len -gt 0 -and $len -eq $prev) { break }; $prev = $len }
+    if (Test-Path -LiteralPath $dst) { $len = (Get-Item -LiteralPath $dst).Length; if ($len -gt 0 -and $len -eq $prev) { break }; $prev = $len; continue }
+    $tw = Win { param($w) $w[1] -like ('*' + $zname + '*') }
+    if ($tw -and ((Get-Date) - $t0).TotalSeconds -gt 2) {
+      $f = Get-ChildItem -Path ([Environment]::GetFolderPath('MyDocuments')), ([Environment]::GetFolderPath('Desktop')), (Split-Path $src) -Filter $zname -Recurse -Depth 2 -ErrorAction SilentlyContinue | Where-Object { $_.LastWriteTime -ge $start } | Select-Object -First 1
+      if ($f) { Start-Sleep -Milliseconds 800; L ('moved from ' + $f.FullName); Move-Item -LiteralPath $f.FullName -Destination $dst; continue }
+    }
     $d = Win { param($w) $w[2] -eq 'TMessageForm' -or ($w[2] -eq '#32770' -and [IntPtr]$w[0] -ne $sh) }; if ($d) { throw ('TubesT: ' + $d[1] + ' ' + (([TW]::Kids([IntPtr]$d[0]) | ForEach-Object { $_[1] }) -join ' ')) }
     if (((Get-Date) - $t0).TotalSeconds -gt 180) { throw 'файл .zzx не появился' } }
   Start-Sleep -Milliseconds 800
+  L 'ok'
   [IO.Path]::GetFileName($dst)
 } finally {
   if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue }

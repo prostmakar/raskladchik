@@ -1654,11 +1654,27 @@ async function cutExport(){
   btn.disabled=true; const html0=btn.innerHTML; btn.textContent='Готовлю…';
   try{
     const lack=new Map(); // id детали -> почему нет
+    // исходников нет ни в памяти, ни по пути (перетаскивали, а папку не указали) — спросим папку и найдём по имени
+    if(Paths.api){
+      const miss=[];
+      for(const p of solid){ if(!/^(IGES|STEP)$/.test(p.fmt||'') || srcBytes.has(p.id)) continue;
+        if(p.path){ try{ srcBytes.set(p.id, await Paths.read(p.path)); continue; }catch(e){} }
+        miss.push(p); }
+      if(miss.length && confirm(`Не знаю, где лежат исходные файлы ${miss.length} деталей (${miss.slice(0,3).map(p=>p.file||p.name).join(', ')}${miss.length>3?'…':''}).\nУказать папку с ними? Подпапки тоже проверю.`)){
+        let start=''; try{ start=localStorage.getItem('where.dir')||''; }catch(e){}
+        const r = await (await fetch('/api/pickdir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({start, prompt:'Папка с исходными файлами деталей'})})).json();
+        if(r.dir){ try{ localStorage.setItem('where.dir', r.dir); }catch(e){}
+          const f = await (await fetch('/api/findfiles',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dir:r.dir, files:miss.map(p=>({name:p.file||'', size:0}))})})).json();
+          const found=f.found||{};
+          for(const p of miss){ const path=found[String(p.file||'').toLowerCase()]; if(path){ p.path=path; try{ srcBytes.set(p.id, await Paths.read(path)); }catch(e){} } }
+          save(); render(); }
+      }
+    }
     for(const p of solid){
       if(p.fmt!=='IGES' && p.fmt!=='STEP'){ lack.set(p.id,'x_t — пока только IGES и STEP'); continue; }
       let b=srcBytes.get(p.id);
       if(!b && p.path && Paths.api){ try{ b=await Paths.read(p.path); srcBytes.set(p.id,b); }catch(e){} }
-      if(!b){ lack.set(p.id,'исходный файл не найден'+(p.path?': '+p.path:'')); continue; }
+      if(!b){ lack.set(p.id,'нет исходного файла'+(p.path?' по пути '+p.path:'')); continue; }
       if(!p.res || !p.res.fr){ try{ p.res = XTCut.analyzeModel(p.fmt==='IGES'?IGES.toModel(b):STEP.toModel(b)); }catch(e){ lack.set(p.id, e.message); } }
       await new Promise(r=>setTimeout(r,0));
     }
@@ -1671,7 +1687,7 @@ async function cutExport(){
       if(it3.some(it=>byId(it.p.key).fmt!=='STEP')) plan.push({g,pt,bi,fmt:'IGES'});
       if(it3.some(it=>byId(it.p.key).fmt==='STEP')) plan.push({g,pt,bi,fmt:'STEP'});
     }
-    if(!plan.length){ alert('Не получилось ни одного файла:\n'+[...lack.values()].join('\n')); return; }
+    if(!plan.length){ alert('Не получилось ни одного файла:\n'+[...lack].map(([id,w])=>{ const p=byId(id); return (p?p.name:id)+' — '+w; }).join('\n')); return; }
     const nameOf = (g,pt,bi) => `${String(bi).padStart(2,"0")} ${g.pk} ${Math.round(pt.S||g.S)} мм${pt.stock?' отход':''} x${pt.n}`;
     let dir='';
     if(Paths.api){
