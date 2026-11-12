@@ -49,3 +49,23 @@ func pickSaveFile(name, filter, title string) (string, error) {
 }
 
 func configDir() string { return filepath.Join(documentsDir(), ".raskl-config") }
+
+// TubesT для проверки не под Windows: TUBEST_FAKE=1 — «переводит» igs в zzx копированием
+func tubestExe() string {
+	if os.Getenv("TUBEST_FAKE") != "" {
+		return "fake"
+	}
+	return ""
+}
+func tubestRunning() bool { return false }
+func tubestConvert(exe, src string) (string, error) {
+	dst := strings.TrimSuffix(src, filepath.Ext(src)) + ".zzx"
+	b, err := os.ReadFile(src)
+	if err != nil {
+		return "", err
+	}
+	if len(b) > 100 {
+		b = b[:100]
+	}
+	return filepath.Base(dst), os.WriteFile(dst, b, 0o644)
+}

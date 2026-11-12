@@ -347,6 +347,8 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.hist(w, r)
 	case "/api/openfiles", "/api/file", "/api/findfiles", "/api/proj/export", "/api/proj/import", "/api/savefile":
 		s.files(w, r)
+	case "/api/tubest/check", "/api/tubest/status", "/api/tubest/start", "/api/tubest/stop":
+		s.tubestAPI(w, r)
 	case "/api/open":
 		if r.Method != http.MethodPost || !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
 			http.Error(w, "bad request", 400)

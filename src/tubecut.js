@@ -217,7 +217,7 @@
     pFlush();
     const S = (info.comment || ['Raskladchik']).map((s, i) => line(s, 'S', i + 1));
     const d = new Date(); const ds = d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0') + '.' + String(d.getHours()).padStart(2, '0') + String(d.getMinutes()).padStart(2, '0') + String(d.getSeconds()).padStart(2, '0');
-    const gTok = ['1H,', '1H;', holl('Raskladchik'), holl(info.file || 'bar.igs'), holl('Raskladchik'), holl(info.ver || '1'), '32', '38', '6', '308', '15', holl('Raskladchik'), '1.', '2', '2HMM', '1', '1.', holl(ds), '0.001', '0.', holl(''), holl(''), '11', '0', holl(ds)];
+    const gTok = ['1H,', '1H;', holl('Raskladchik'), holl(info.file || 'bar.igs'), holl('Raskladchik'), holl(info.ver || '1'), '32', '38', '6', '308', '15', holl('Raskladchik'), '1.', '2', '2HMM', '1', '1.', holl(ds), '0.001', '0.', '', '', '11', '0', holl(ds)];
     const G = []; { let cur = ''; for (let i = 0; i < gTok.length; i++) { const tk = gTok[i] + (i === gTok.length - 1 ? ';' : ','); if (cur.length + tk.length > 72) { G.push(cur); cur = ''; } cur += tk; } if (cur) G.push(cur); }
     const T = 'S' + String(S.length).padStart(7, '0') + 'G' + String(G.length).padStart(7, '0') + 'D' + String(Dl.length).padStart(7, '0') + 'P' + String(pCount).padStart(7, '0');
     const head = linesToBytes([...S, ...G.map((g, i) => line(g, 'G', i + 1)), ...Dl], '\r\n'), tail = toBytes(line(T, 'T', 1) + '\r\n');
