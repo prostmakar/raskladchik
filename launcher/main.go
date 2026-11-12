@@ -242,7 +242,7 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if req.Folder == "" {
 			folder = "Исправленные DXF"
 		}
-		if folder != "Исправленные DXF" && folder != "Отредактированные PDF" {
+		if folder != "Исправленные DXF" && folder != "Отредактированные PDF" && folder != "Раскрой труб" {
 			folder = "Исправленные DXF"
 		}
 		dir := filepath.Join(desktopDir(), folder, time.Now().Format("2006-01-02 15-04-05"))
@@ -277,8 +277,8 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				}
 				data = b
 			}
-			// только чертежи и PDF
-			if !strings.HasSuffix(low, ".dxf") && !strings.HasSuffix(low, ".pdf") {
+			// только чертежи, PDF, 3D хлыстов и отчёт
+			if !strings.HasSuffix(low, ".dxf") && !strings.HasSuffix(low, ".pdf") && !(folder == "Раскрой труб" && (strings.HasSuffix(low, ".igs") || strings.HasSuffix(low, ".stp") || strings.HasSuffix(low, ".txt"))) {
 				name += ".dxf"
 			}
 			// исходники и уже сохранённое не перезаписываются: при совпадении имени — «имя (2).dxf»
@@ -323,12 +323,9 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			Dir string `json:"dir"`
 		}
 		json.NewDecoder(io.LimitReader(r.Body, 1<<16)).Decode(&req)
-		base := filepath.Clean(desktopDir()) + string(os.PathSeparator)
+		// папка из проекта может быть сохранена в прошлый раз или на другом компьютере (общий сервер) — открываем любую существующую
 		d := filepath.Clean(req.Dir)
-		s.mu.Lock()
-		ok := s.saved[strings.ToLower(d)]
-		s.mu.Unlock()
-		if !ok && !strings.HasPrefix(strings.ToLower(d), strings.ToLower(base)) {
+		if !filepath.IsAbs(d) {
 			http.Error(w, "forbidden", 403)
 			return
 		}

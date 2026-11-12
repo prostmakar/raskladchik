@@ -235,13 +235,14 @@
   function orientations(g) {
     const out = [], seen = new Set();
     if (g.sym === 'path') { // открытый профиль: точки вдоль полок; разворот концами = обход точек в обратном порядке
-      out.push({ lo: g.lo.slice(), ro: g.ro.slice(), angL: g.angL, angR: g.angR, flip: false, op: 0 });
+      out.push({ lo: g.lo.slice(), ro: g.ro.slice(), angL: g.angL, angR: g.angR, flip: false, op: 0, sx: 1, mi: 0 });
       if (g.symmetric) { const n = g.lo.length; const lo = [], ro = []; for (let k = 0; k < n; k++) { lo[k] = g.L - g.ro[n - 1 - k]; ro[k] = g.L - g.lo[n - 1 - k]; }
         const key = lo.map(v => v.toFixed(2)).join(',') + '|' + ro.map(v => v.toFixed(2)).join(',');
-        if (key !== g.lo.map(v => v.toFixed(2)).join(',') + '|' + g.ro.map(v => v.toFixed(2)).join(',')) out.push({ lo, ro, angL: g.angR, angR: g.angL, flip: true, op: 1 }); }
+        if (key !== g.lo.map(v => v.toFixed(2)).join(',') + '|' + g.ro.map(v => v.toFixed(2)).join(',')) out.push({ lo, ro, angL: g.angR, angR: g.angL, flip: true, op: 1, sx: -1, mi: 1 }); }
       return out;
     }
-    for (const [sx, m] of OPS[g.sym] || OPS.none) {
+    const ops = OPS[g.sym] || OPS.none;
+    for (let mi = 0; mi < ops.length; mi++) { const [sx, m] = ops[mi];
       const lo = [], ro = [];
       for (let k = 0; k < 4; k++) {
         if (sx > 0) { lo[m(k)] = g.lo[k]; ro[m(k)] = g.ro[k]; }
@@ -249,9 +250,25 @@
       }
       const key = lo.map(v => v.toFixed(2)).join(',') + '|' + ro.map(v => v.toFixed(2)).join(',');
       if (seen.has(key)) continue; seen.add(key);
-      out.push({ lo, ro, angL: sx > 0 ? g.angL : g.angR, angR: sx > 0 ? g.angR : g.angL, flip: sx < 0, op: out.length });
+      out.push({ lo, ro, angL: sx > 0 ? g.angL : g.angR, angR: sx > 0 ? g.angR : g.angL, flip: sx < 0, op: out.length, sx, mi });
     }
     return out;
+  }
+
+  // как деталь лежит на хлысте: точка (x вдоль оси, a, b по сечению) после разворота o
+  // g — форма детали, box — габарит сечения [a0,a1,b0,b1], C — хорда открытого профиля
+  function orientMap(g, o, box, C) {
+    const L = g.L, sx = o.sx || 1;
+    if (g.sym === 'path') return sx > 0 ? (x, a, b) => [x, a, b] : (x, a, b) => [L - x, C - a, b];
+    const A = box[1] + box[0], B = box[3] + box[2]; // a → A−a отражает габарит в себя
+    const F = { fi: (a, b) => [A - a, b], fj: (a, b) => [a, B - b], sw: (a, b) => [b, a] };
+    const seq = {
+      none: [[]], rect: [[], ['fj', 'fi'], ['fi'], ['fj']],
+      square: [[], ['fj', 'fi'], ['fi', 'sw'], ['fj', 'sw'], ['fi'], ['fj'], ['sw'], ['fj', 'fi', 'sw']],
+      angleEq: [[], ['sw']], angle: [[]], channel: [[], ['fi']],
+    }[g.sym] || [[]];
+    const ops = seq[o.mi || 0] || [];
+    return (x, a, b) => { let q = [a, b]; for (const f of ops) q = F[f](q[0], q[1]); return [sx > 0 ? x : L - x, q[0], q[1]]; };
   }
 
   // ---------- nesting with skew-aware placement ----------
@@ -389,6 +406,6 @@
     return null;
   }
 
-  root.Calc = { num, fmtN, parseAngle, PROF, autoR, profileLabel, endCutLen, manualAnalyze, summarize, validate, parseDrawing, nest, manualShape, orientations, nestShapes, nestWithStock, sectionArea, kgPerM, coatPerim, endAngleToAxis };
+  root.Calc = { orientMap, num, fmtN, parseAngle, PROF, autoR, profileLabel, endCutLen, manualAnalyze, summarize, validate, parseDrawing, nest, manualShape, orientations, nestShapes, nestWithStock, sectionArea, kgPerM, coatPerim, endAngleToAxis };
   if (typeof module !== 'undefined') module.exports = root.Calc;
 })(typeof window !== 'undefined' ? window : globalThis);

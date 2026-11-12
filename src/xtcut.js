@@ -433,7 +433,7 @@
     const prof = { type: round ? 'round' : kind === 'angle' ? 'angle' : kind === 'channel' ? 'channel' : 'rect', a: round ? r1(Math.max(w, h)) : pa_, b: round ? '' : pb_, t: thick };
 
     // end shape for nesting: axial position of each end at the 4 corners of the profile box
-    let shape = null;
+    let shape = null, fr = null;
     {
       let dA = [1, 0];
       if (op) { const n = norm(op.surf.n); dA = [dot(n, U), dot(n, V)]; }
@@ -444,12 +444,20 @@
       const corner = k => { const ca = (k >> 1) ? aMax : aMin, cb = (k & 1) ? bMax : bMin; return [ca * dA[0] + cb * dB[0], ca * dA[1] + cb * dB[1]]; };
       const sorted = endPts.slice().sort((x, y) => x.z - y.z);
       const atCorners = e => [0, 1, 2, 3].map(k => { const c = corner(k); let best = Infinity, z = 0; for (const p of e.pts) { const q = to2(p); const d = (q[0] - c[0]) ** 2 + (q[1] - c[1]) ** 2; if (d < best) { best = d; z = dot(p, axis); } } return z - zmin; });
+      // у скруглённых углов ближайшая к углу точка торца — не самая выступающая: сдвигаем торец так, чтобы ни одна точка не вылезала за раскладку
+      const bil = (v, q) => { const u = A ? ((q[0] * dA[0] + q[1] * dA[1]) - aMin) / A : 0, w = B ? ((q[0] * dB[0] + q[1] * dB[1]) - bMin) / B : 0; return v[0] * (1 - u) * (1 - w) + v[1] * (1 - u) * w + v[2] * u * (1 - w) + v[3] * u * w; };
+      const over = (e, v, left) => { let m = 0; for (const p of e.pts) { const d = left ? bil(v, to2(p)) - (dot(p, axis) - zmin) : (dot(p, axis) - zmin) - bil(v, to2(p)); if (d > m) m = d; } return m; };
       const L = zmax - zmin;
       const lo = sorted.length >= 1 && sorted[0].z - zmin < L / 2 ? atCorners(sorted[0]) : [0, 0, 0, 0];
       const right = sorted.length && sorted[sorted.length - 1].z - zmin >= L / 2 ? sorted[sorted.length - 1] : null;
       const ro = right ? atCorners(right) : [L, L, L, L];
+      if (sorted.length >= 1 && sorted[0].z - zmin < L / 2) { const d = over(sorted[0], lo, true); for (let k = 0; k < 4; k++) lo[k] -= d; }
+      if (right) { const d = over(right, ro, false); for (let k = 0; k < 4; k++) ro[k] += d; }
       const mn = Math.min(...lo); for (let k = 0; k < 4; k++) { lo[k] -= mn; ro[k] -= mn; }
       const angOf = (v, sgn) => { const sa = Math.abs(v[2] - v[0]), sb = Math.abs(v[1] - v[0]); const sp = Math.max(sa, sb); if (sp < 0.05) return 90; return Math.atan2(sa >= sb ? A : B, sp) * 180 / Math.PI; };
+      // система координат детали для выкладки на хлыст: x — вдоль оси от нуля формы, a/b — по сторонам габарита сечения
+      const e1 = add(mul(U, dA[0]), mul(V, dA[1])), e2 = add(mul(U, dB[0]), mul(V, dB[1]));
+      fr = { ax: axis, e1, e2, x0: zmin + mn, a0: aMin, b0: bMin, box: [0, A, 0, B], kind: 'box' };
       shape = { L, A: r1(A), B: r1(B), sym: kind === 'angle' ? (Math.abs(A - B) < 0.05 ? 'angleEq' : 'angle') : kind === 'channel' ? 'channel' : round || Math.abs(A - B) < 0.05 ? 'square' : 'rect', lo: lo.map(v => Math.round(v * 100) / 100), ro: ro.map(v => Math.round(v * 100) / 100), angL: angOf(lo), angR: angOf(ro) };
       // открытый профиль: форма торцов — по точкам вдоль наружных полок (от кромки одной полки до кромки другой)
       if (kind !== 'closed' && openGap) {
@@ -467,6 +475,11 @@
         const mn = Math.min(...plo); for (let k = 0; k < NS; k++) { plo[k] = Math.round((plo[k] - mn) * 100) / 100; pro[k] = Math.round((pro[k] - mn) * 100) / 100; }
         const symm = kind === 'channel' || Math.abs(pa_ - pb_) < 0.05;
         Object.assign(shape, { sym: 'path', symmetric: symm, lo: plo, ro: pro });
+        // открытый профиль: ось a — по хорде от кромки первой полки к кромке последней (одинаково для всех деталей профиля)
+        const c0 = samp[0], c1 = samp[NS - 1]; const cl = Math.hypot(c1[0] - c0[0], c1[1] - c0[1]) || 1; const u2 = [(c1[0] - c0[0]) / cl, (c1[1] - c0[1]) / cl], v2 = [-u2[1], u2[0]];
+        const pe1 = add(mul(U, u2[0]), mul(V, u2[1])), pe2 = add(mul(U, v2[0]), mul(V, v2[1]));
+        const pa = H.map(q => (q[0] - c0[0]) * u2[0] + (q[1] - c0[1]) * u2[1]), pb = H.map(q => (q[0] - c0[0]) * v2[0] + (q[1] - c0[1]) * v2[1]);
+        fr = { ax: axis, e1: pe1, e2: pe2, x0: zmin + mn, a0: c0[0] * u2[0] + c0[1] * u2[1], b0: c0[0] * v2[0] + c0[1] * v2[1], box: [Math.min(...pa), Math.max(...pa), Math.min(...pb), Math.max(...pb)], C: cl, kind: 'path' };
       }
     }
     // углы торцов к оси — по плоскости, в которой лежит контур торца
@@ -499,7 +512,7 @@
       if (!(areaFull > 1.5 * areaOuter)) areaFull = 2 * areaOuter;
       areaApprox = true;
     }
-    return { length: zmax - zmin, profile: profile + (thick ? '×' + String(thick).replace('.', ',') : ''), prof, shape, contours, warnings: [...warnings], nEdges: E.length, nFaces: F.size, view: { edges: view, axis }, endAng, areaOuter, areaFull, areaApprox };
+    return { length: zmax - zmin, profile: profile + (thick ? '×' + String(thick).replace('.', ',') : ''), prof, shape, contours, warnings: [...warnings], nEdges: E.length, nFaces: F.size, view: { edges: view, axis }, fr, endAng, areaOuter, areaFull, areaApprox };
   }
 
   // summary for a torcovka mode: 'both' | 'one' | 'none'

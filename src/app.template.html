@@ -257,6 +257,7 @@ input::placeholder{color:var(--muted);opacity:.8}
 
 .home{appearance:none;border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:9px;font:inherit;font-size:16px;width:34px;height:34px;margin-right:10px;cursor:pointer;vertical-align:3px}
 .home:hover{color:var(--ink);border-color:var(--ink)}
+.cutbar{display:flex;gap:8px;margin-right:auto}.cutbar em{font-style:normal;font-size:11px;font-weight:700;color:var(--accent);margin-left:4px;letter-spacing:.04em}
 .modesw{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--panel);margin-right:auto}
 .modesw button{border:0;background:transparent;color:var(--muted);font:inherit;font-size:13.5px;font-weight:600;padding:6px 12px;cursor:pointer}
 .modesw button.on{background:var(--soft);color:var(--accent)}
@@ -474,7 +475,7 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
 <div class="wrap" id="appTube" hidden>
   <header>
     <h1><button class="home" data-go="home" title="К выбору: трубы или лист">←</button>Длина <span>реза</span> трубы <span class="projtag"></span></h1>
-    <div class="modesw"><button data-go="tube" class="on">Трубы</button><button data-go="sheet">Лист</button><button data-go="pdf">PDF</button></div>
+    <div class="cutbar"><button class="btn" id="cutBtn">Раскрой трубы <em>ТЕСТ</em></button><button class="btn" id="cutDir" hidden title="">📂 Папка раскроя</button></div>
     <div class="tabs" id="tabs">
       <button data-t="parts" class="on">Детали<span class="cnt" id="cntParts"></span></button>
       <button data-t="nest">Раскладка по хлыстам</button>
@@ -685,6 +686,11 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
   <div class="dlg-f"><span class="meta" id="histDir"></span><span class="spacer"></span><button class="btn" id="histChange">Сменить папку…</button><button class="btn" id="histFolder">Открыть папку</button></div>
 </div></div>
 <div class="wherebar" id="whereBar" hidden></div>
+<div class="modal center" id="cutDone" hidden><div class="dlg">
+  <div class="dlg-h"><h2>Раскрой сохранён</h2><button class="ic" id="cutDoneClose">✕</button></div>
+  <div class="dlg-b"><div id="cutDoneTxt" style="word-break:break-all"></div><div class="meta" id="cutDoneLack" style="margin-top:8px"></div>
+  <div style="display:flex;justify-content:flex-end;margin-top:14px"><button class="btn primary" id="cutDoneOpen">📂 Открыть папку</button></div></div>
+</div></div>
 <div class="modal center" id="setm" hidden><div class="dlg">
   <div class="dlg-h"><h2>Настройки</h2><button class="ic" id="setClose">✕</button></div>
   <div class="dlg-b"><label class="setf">Имя<input type="text" id="setName" placeholder="Андрей" autocomplete="off"></label></div>
@@ -892,6 +898,7 @@ let saved = store.get('xtcut.v2', null);
 const st = {
   parts: (saved && saved.parts) || [],
   defMode: (saved && saved.defMode) || 'both',
+  cutDir: (saved && saved.cutDir) || '',
   nest: Object.assign({S:6000,kerf:5,t0:0,t1:0,biz:500,per:{},stock:{}}, saved && saved.nest || {}),
   tab: 'parts'
 };
@@ -900,7 +907,7 @@ if(!st.nest.stock) st.nest.stock={};
 let nextId = st.parts.reduce((m,p)=>Math.max(m,p.id),0)+1;
 const previews = new Map(); // part id -> {bytes, doc}
 function save(){
-  const d={parts:st.parts, defMode:st.defMode, nest:st.nest};
+  const d={parts:st.parts, defMode:st.defMode, nest:st.nest, cutDir:st.cutDir||''};
   try{ localStorage.setItem('xtcut.v2', JSON.stringify(d)); }
   catch(e){ // не влезло — без данных для 3D-просмотра
     try{ localStorage.setItem('xtcut.v2', JSON.stringify(Object.assign({}, d, {parts: st.parts.map(p=>p.res&&p.res.view?Object.assign({},p,{res:Object.assign({},p.res,{view:null})}):p)}))); }catch(e2){}
@@ -941,6 +948,7 @@ function readAs(f, kind){ return new Promise((res,rej)=>{ const r=new FileReader
 async function addFiles(list){
   for(const f of [...list]) await addOne(f.name, ()=>readAs(f,'text'), async()=>new Uint8Array(await readAs(f,'bin')));
 }
+const srcBytes = new Map(); // исходники IGES/STEP этой сессии — для раскроя в 3D
 async function addOne(name, getText, getBytes, preItems, path){
   const ext = (name.match(/\.([^.]+)$/)||[])[1]; const e = (ext||'').toLowerCase();
   if(e==='x_t' || e==='xmt_txt'){
@@ -953,14 +961,14 @@ async function addOne(name, getText, getBytes, preItems, path){
   if(e==='igs' || e==='iges'){
     const p = {id:nextId++, src:'xt', fmt:'IGES', name:baseName(name), file:name, path:path||'', qty:1, mode:st.defMode, status:null, res:null, err:null};
     st.parts.push(p); render(); await new Promise(r=>setTimeout(r,0));
-    try{ const b = await getBytes(); p.res = XTCut.analyzeModel(IGES.toModel(b)); }
+    try{ const b = await getBytes(); srcBytes.set(p.id, b); p.res = XTCut.analyzeModel(IGES.toModel(b)); }
     catch(err){ p.err = (err&&err.message)||'Не удалось обработать IGES'; }
     save(); render(); return;
   }
   if(e==='stp' || e==='step'){
     const p = {id:nextId++, src:'xt', fmt:'STEP', name:baseName(name), file:name, path:path||'', qty:1, mode:st.defMode, status:null, res:null, err:null};
     st.parts.push(p); render(); await new Promise(r=>setTimeout(r,0));
-    try{ const b = await getBytes(); p.res = XTCut.analyzeModel(STEP.toModel(b)); }
+    try{ const b = await getBytes(); srcBytes.set(p.id, b); p.res = XTCut.analyzeModel(STEP.toModel(b)); }
     catch(err){ p.err = (err&&err.message)||'Не удалось обработать STEP'; }
     save(); render(); return;
   }
@@ -1631,6 +1639,72 @@ function nestSheets(){
   return [{name:'Закупка',cols:[30,12,14,10,12,14,11,16,10,16,14,14],rows:r1,heights:{3:32}},{name:'Раскрой',cols:[26,22,14,12,80,10,12,10],rows:r2,landscape:true,freeze:3}];
 }
 
+// ---------- раскрой труб в 3D: один файл на хлыст ----------
+const tr = s => String(s).replace(/Ø/g,'D').replace(/[×х]/g,'x').replace(/[^\x20-\x7e]/g,'');
+function cutDirBtn(){ const b=$('#cutDir'); b.hidden = !st.cutDir || !Paths.api; b.title = st.cutDir||''; }
+async function openCutDir(){ if(!st.cutDir) return; try{ const r = await fetch('/api/open',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dir:st.cutDir})}); if(!r.ok) alert('Папка не найдена:\n'+st.cutDir); }catch(e){ alert(e.message); } }
+$('#cutDir').addEventListener('click', openCutDir);
+const b64 = u8 => { let s=''; for(let i=0;i<u8.length;i+=8192) s+=String.fromCharCode.apply(null,u8.subarray(i,i+8192)); return btoa(s); };
+async function cutExport(){
+  const btn=$('#cutBtn'); if(btn.disabled) return;
+  const solid = st.parts.filter(p=>p.src==='xt' && !p.err);
+  if(!solid.length){ alert('Нет деталей из 3D-файлов (IGES, STEP)'); return; }
+  btn.disabled=true; const html0=btn.innerHTML; btn.textContent='Готовлю…';
+  try{
+    const lack=new Map(); // id детали -> почему нет
+    for(const p of solid){
+      if(p.fmt!=='IGES' && p.fmt!=='STEP'){ lack.set(p.id,'x_t — пока только IGES и STEP'); continue; }
+      let b=srcBytes.get(p.id);
+      if(!b && p.path && Paths.api){ try{ b=await Paths.read(p.path); srcBytes.set(p.id,b); }catch(e){} }
+      if(!b){ lack.set(p.id,'исходный файл не найден'+(p.path?': '+p.path:'')); continue; }
+      if(!p.res || !p.res.fr){ try{ p.res = XTCut.analyzeModel(p.fmt==='IGES'?IGES.toModel(b):STEP.toModel(b)); }catch(e){ lack.set(p.id, e.message); } }
+      await new Promise(r=>setTimeout(r,0));
+    }
+    save(); showTab('nest');
+    const nb=st.nest, files=[], rep=[];
+    const d=new Date().toLocaleString('ru-RU');
+    rep.push('Раскрой труб — '+(window.fileBase?window.fileBase():''), 'Сохранено: '+d, '');
+    let bi=0;
+    for(const g of lastNest){
+      rep.push('=== '+g.pk+' — хлыст '+fmt(g.S,0)+' мм, между деталями '+fmt(g.K,1)+' мм, обрезка начала '+fmt(nb.t0,0)+' мм, зажим '+fmt(nb.t1,0)+' мм');
+      for(const pt of g.R.patterns){
+        bi++; const S=pt.S||g.S; const nm=`${String(bi).padStart(2,"0")} ${g.pk} ${Math.round(S)} мм${pt.stock?' отход':''} x${pt.n}`;
+        const igs=[], stp=[], miss=[];
+        for(const it of pt.items){
+          const p=byId(it.p.key); const why = !p ? 'деталь удалена' : p.src!=='xt' ? 'нет 3D (чертёж или вручную)' : lack.get(p.id);
+          if(why){ miss.push(it.p.name+' — '+why); continue; }
+          const M=TubeCut.barMatrix(p.res.fr, it.p.g, it.o, it.s);
+          (p.fmt==='STEP'?stp:igs).push({bytes:srcBytes.get(p.id), M});
+        }
+        const info = { comment: ['Raskladchik v__APP_VER__', `Bar ${bi}: ${tr(g.pk)}, L=${S} mm, x${pt.n}${pt.stock?' (offcut)':''}`, `Gap ${g.K} mm, start trim ${nb.t0} mm, clamp ${nb.t1} mm`, `Parts: ${pt.items.length}`] };
+        if(igs.length) files.push({name: nm+'.igs', bytes: TubeCut.buildIGES(igs, Object.assign({file: tr(nm)+'.igs'}, info))});
+        if(stp.length) files.push({name: nm+(igs.length?' (STEP)':'')+'.stp', bytes: TubeCut.buildSTEP(stp, Object.assign({file: tr(nm)+'.stp'}, info))});
+        rep.push('', nm+(igs.length||stp.length?'':'  — файл не создан'), ...pt.items.map(it=>`  с ${fmt(it.s+Math.min(...it.o.lo),1)} мм: ${it.p.name} — ${fmt(it.p.g.L,1)} мм${it.o.flip?' (развёрнута)':''}`), `  остаток ${fmt(pt.rest+nb.t1,0)} мм`);
+        if(miss.length) rep.push('  нет в файле: '+miss.join('; '));
+        await new Promise(r=>setTimeout(r,0));
+      }
+      if(g.R.too.length) rep.push('Не помещаются в хлыст: '+[...new Set(g.R.too.map(t=>t.name))].join(', '));
+      rep.push('');
+    }
+    if(!files.length){ alert('Не получилось ни одного файла:\n'+[...lack.values()].join('\n')); return; }
+    files.push({name:'Раскрой.txt', bytes:new TextEncoder().encode('\ufeff'+rep.join('\r\n'))});
+    if(!Paths.api){ for(const f of files){ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([f.bytes])); a.download=f.name; a.click(); await new Promise(r=>setTimeout(r,300)); } return; }
+    const to = await window.SaveDlg('cut', files.length-1); if(!to) return;
+    btn.textContent='Сохраняю…';
+    const r = await (await fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({folder:'Раскрой труб', base:to.base||'', name:to.name||'', files:files.map(f=>({name:f.name, b64:b64(f.bytes)}))})})).json();
+    if(r.error){ alert('Не сохранилось: '+r.error); return; }
+    st.cutDir=r.dir; save(); cutDirBtn();
+    $('#cutDoneTxt').textContent = `${files.length-1} ${files.length-1===1?'файл':'файлов'} — ${r.dir}`;
+    $('#cutDoneLack').textContent = lack.size ? 'Без 3D: '+[...lack].map(([id,w])=>{ const p=byId(id); return (p?p.name:id)+' ('+w+')'; }).join(', ') : '';
+    $('#cutDone').hidden=false;
+  }catch(e){ alert('Ошибка: '+e.message); }
+  finally{ btn.disabled=false; btn.innerHTML=html0; }
+}
+$('#cutBtn').addEventListener('click', cutExport);
+$('#cutDoneOpen').addEventListener('click', ()=>{ $('#cutDone').hidden=true; openCutDir(); });
+$('#cutDoneClose').addEventListener('click', ()=>{ $('#cutDone').hidden=true; });
+cutDirBtn();
+
 // ---------- startup files from the .exe ----------
 (async()=>{
   render();
@@ -1651,7 +1725,7 @@ async function editInPdf(id){
   if(!pv && p.path && Paths.api){ try{ let b=await Paths.read(p.path); if(!/\.pdf$/i.test(p.path)) b=Media.tiffToPdf(b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength)); pv={bytes:b}; previews.set(id,pv); }catch(e){ alert(e.message); return; } }
   if(!pv){ alert('Чертежа нет — перетащите файл снова'); return; }
   if(!$('#modal').hidden) closeEditor();
-  document.querySelector('#appTube .modesw [data-go=pdf]').click();
+  document.querySelector('.st-card[data-go=pdf]').click();
   await window.__pdfedit.takeBytes((p.name||'Чертёж')+'.pdf', pv.bytes, {mod:'tube', id});
 }
 window.__app = { st, addOne, addFiles, openEditor, showTab, render, save, setDrawing, editInPdf };
@@ -1660,6 +1734,9 @@ window.__pdf = { lib: pdfLib, open: openPdf };
 </script>
 <script>
 /*SHEETUI*/
+</script>
+<script>
+/*TUBECUT*/
 </script>
 <script>
 /*DXFEDIT*/
@@ -1800,7 +1877,7 @@ window.__pdf = { lib: pdfLib, open: openPdf };
   }
   async function newProj(name, customer){
     await saveProj(true);
-    const clear = k => { const d = J(k); if(!d) return; d.parts = []; if(k==='xtcut.v2' && d.nest) d.nest.stock = {}; delete d.result; localStorage.setItem(k, JSON.stringify(d)); };
+    const clear = k => { const d = J(k); if(!d) return; d.parts = []; if(k==='xtcut.v2' && d.nest) d.nest.stock = {}; delete d.result; delete d.cutDir; localStorage.setItem(k, JSON.stringify(d)); };
     clear('xtcut.v2'); clear('sheet.v1');
     const meta = { id: newId(), name: name || '', auto: !name, customer: customer || '', comment: '', created: Date.now(), author: window.userName() };
     if(!meta.name) meta.name = autoName({names: []}, meta.created);
@@ -1988,8 +2065,8 @@ window.__pdf = { lib: pdfLib, open: openPdf };
     return new Promise(resolve => {
       const key = 'save.base.' + kind; let base = ''; try{ base = localStorage.getItem(key) || ''; }catch(e){}
       const meta = J('proj.cur'); const stamp = new Date().toLocaleString('ru-RU').replace(/[:/\\]/g,'-').replace(',', '');
-      const what = kind === 'pdf' ? 'Отредактированные PDF' : 'Исправленные DXF';
-      $('#sdTitle').textContent = `Сохранить ${count} ${kind==='pdf'?'PDF':'DXF'}`;
+      const what = kind === 'pdf' ? 'Отредактированные PDF' : kind === 'cut' ? 'Раскрой труб' : 'Исправленные DXF';
+      $('#sdTitle').textContent = kind==='cut' ? `Сохранить раскрой: ${count} файлов` : `Сохранить ${count} ${kind==='pdf'?'PDF':'DXF'}`;
       $('#sdBase').value = base; $('#sdName').value = (meta && meta.name && !meta.auto ? meta.name + ' — ' : '') + what + ' ' + stamp;
       $('#sdNote').innerHTML = '';
       $('#sdlg').hidden = false; setTimeout(()=>{ $('#sdName').focus(); $('#sdName').select(); }, 30);

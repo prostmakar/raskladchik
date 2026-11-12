@@ -56,6 +56,7 @@ def build_page():
         '/*NEST2D*/': read(os.path.join(SRC, 'nest2d.js')),
         '/*SHEETUI*/': read(os.path.join(SRC, 'sheetui.js')),
         '/*DXFEDIT*/': read(os.path.join(SRC, 'dxfedit.js')),
+        '/*TUBECUT*/': read(os.path.join(SRC, 'tubecut.js')),
         '/*PDFEDIT*/': read(os.path.join(SRC, 'pdfedit.js')),
         '/*JBIG2*/': base64.b64encode(read(os.path.join(VENDOR, 'jbig2.wasm'), True)).decode(),
         '/*PDFWK*/': read(os.path.join(VENDOR, 'pdf.worker.min.mjs')),
