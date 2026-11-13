@@ -504,7 +504,7 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
     <div class="tablebox">
       <table>
         <thead><tr>
-          <th>Деталь</th><th>Торцовка</th><th class="num">Кол-во</th><th class="num">Рез на 1 шт, мм</th><th class="num">Рез всего, м</th><th></th>
+          <th>Деталь</th><th>Торцовка</th><th class="num">Кол-во</th><th class="num" id="cutUnit" style="cursor:pointer" title="м / мм">Рез на 1 шт, м</th><th class="num">Рез всего, м</th><th></th>
         </tr></thead>
         <tbody id="rows"></tbody>
         <tfoot id="foot" hidden><tr><td>Итого</td><td></td><td class="num" id="tQty"></td><td></td><td class="num" id="tLen"></td><td></td></tr></tfoot>
@@ -691,7 +691,7 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
   <div class="dlg-h"><h2>Раскрой сохранён</h2><button class="ic" id="cutDoneClose">✕</button></div>
   <div class="dlg-b"><div id="cutDoneTxt" style="word-break:break-all"></div><div class="meta" id="cutDoneLack" style="margin-top:8px"></div>
   <div class="zzx" id="zzxBox" hidden><b id="zzxTxt"></b><div class="meta" id="zzxErr"></div></div>
-  <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" id="zzxStop" hidden>Остановить</button><button class="btn" id="zzxGo" hidden>Сделать .zzx</button><button class="btn primary" id="cutDoneOpen">📂 Открыть папку</button></div></div>
+  <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" id="zzxStop" hidden>Остановить</button><button class="btn" id="zzxGo" hidden>Перевести в .zzx</button><button class="btn primary" id="cutDoneOpen">📂 Открыть папку</button></div></div>
 </div></div>
 <div class="modal center" id="setm" hidden><div class="dlg">
   <div class="dlg-h"><h2>Настройки</h2><button class="ic" id="setClose">✕</button></div>
@@ -1005,6 +1005,10 @@ async function addOne(name, getText, getBytes, preItems, path){
 }
 
 // ---------- parts table ----------
+let cutM = (()=>{ try{ return localStorage.getItem('cutUnit')!=='mm'; }catch(e){ return true; } })();
+function cutUnitHead(){ $('#cutUnit').textContent = 'Рез на 1 шт, '+(cutM?'м':'мм'); }
+$('#cutUnit').addEventListener('click', ()=>{ cutM=!cutM; try{ localStorage.setItem('cutUnit', cutM?'m':'mm'); }catch(e){} cutUnitHead(); render(); });
+cutUnitHead();
 function needs(p){ return !p.err && p.src!=='xt' && (p.status==='fill' || p.status==='check'); }
 function render(){
   document.querySelectorAll('#segAll button').forEach(b=>b.classList.toggle('on', b.dataset.m===st.defMode));
@@ -1040,7 +1044,7 @@ function render(){
       <td>${head}<div class="meta">${meta}</div><div class="chips">${chips.join('')}</div>${warn}</td>
       <td><select data-mode="${p.id}">${Object.entries(MODES).map(([k,v])=>`<option value="${k}"${k===p.mode?' selected':''}>${v}</option>`).join('')}</select>${s.nEndsFound===0?'<div class="meta">торцы не найдены</div>':''}</td>
       <td class="num"><input type="number" min="1" step="1" value="${qty}" data-qty="${p.id}"></td>
-      <td class="num big">${fmt(s.total)}</td><td class="num big" data-tot="${p.id}">${fmt(totalM,3)}</td>${acts}</tr>`;
+      <td class="num big">${cutM?fmt(s.total/1000,3):fmt(s.total)}</td><td class="num big" data-tot="${p.id}">${fmt(totalM,3)}</td>${acts}</tr>`;
   }
   tb.innerHTML=html;
   $('#foot').hidden=false; $('#tQty').textContent=tq; $('#tLen').textContent=fmt(tl,3);
@@ -1715,8 +1719,8 @@ async function cutExport(){
     st.cutDir=dir; save(); cutDirBtn();
     $('#cutDoneTxt').textContent = `${plan.length} ${plan.length===1?'файл':plan.length<5?'файла':'файлов'} — ${dir}`;
     $('#cutDoneLack').textContent = lack.size ? 'Без 3D: '+[...lack].map(([id,w])=>{ const p=byId(id); return (p?p.name:id)+' ('+w+')'; }).join(', ') : '';
+    $('#zzxBox').hidden=true; $('#zzxGo').hidden=!tubest;
     $('#cutDone').hidden=false;
-    if(tubest) zzxStart();
   }catch(e){ alert('Ошибка: '+e.message); }
   finally{ btn.disabled=false; btn.innerHTML=html0; }
 }

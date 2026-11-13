@@ -439,7 +439,11 @@
     if (!segs.length) return null;
     // общие рёбра: одинаковые концы и середина (0,02 мм)
     const q = v => Math.round(v * 50);
-    const key = P => { const a = P[0], b = P[P.length - 1], m = P[Math.floor(P.length / 2)]; const ka = q(a[0]) + ',' + q(a[1]) + ',' + q(a[2]), kb = q(b[0]) + ',' + q(b[1]) + ',' + q(b[2]); return (ka < kb ? ka + '|' + kb : kb + '|' + ka) + '|' + q(m[0]) + ',' + q(m[1]) + ',' + q(m[2]); };
+    // середина по длине — не зависит от направления и от того, сколькими точками кривая разбита
+    const mid = P => { let L = 0; for (let k = 1; k < P.length; k++) L += Math.hypot(P[k][0] - P[k - 1][0], P[k][1] - P[k - 1][1], P[k][2] - P[k - 1][2]); let h = L / 2;
+      for (let k = 1; k < P.length; k++) { const d = Math.hypot(P[k][0] - P[k - 1][0], P[k][1] - P[k - 1][1], P[k][2] - P[k - 1][2]); if (h <= d && d > 0) { const t = h / d; return [P[k - 1][0] + (P[k][0] - P[k - 1][0]) * t, P[k - 1][1] + (P[k][1] - P[k - 1][1]) * t, P[k - 1][2] + (P[k][2] - P[k - 1][2]) * t]; } h -= d; } return P[P.length - 1]; };
+    const qm = v => Math.round(v * 2);
+    const key = P => { const a = P[0], b = P[P.length - 1], m = mid(P); const ka = q(a[0]) + ',' + q(a[1]) + ',' + q(a[2]), kb = q(b[0]) + ',' + q(b[1]) + ',' + q(b[2]); return (ka < kb ? ka + '|' + kb : kb + '|' + ka) + '|' + qm(m[0]) + ',' + qm(m[1]) + ',' + qm(m[2]); };
     const map = new Map();
     for (const s of segs) { const k = key(s.P); if (!map.has(k)) map.set(k, { P: s.P, faces: [] }); const m = map.get(k); if (!m.faces.includes(s.face)) m.faces.push(s.face); s.k = k; }
     const edges = []; let id = 0;
