@@ -224,6 +224,6 @@
     return { edges, faces: out, info: { scale: C.scale } };
   }
 
-  root.STEP = { toModel, parse };
+  root.STEP = { toModel, parse, makeCtx };
   if (typeof module !== 'undefined') module.exports = root.STEP;
 })(typeof window !== 'undefined' ? window : globalThis);

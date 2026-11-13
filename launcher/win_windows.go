@@ -254,21 +254,22 @@ try {
   function Win($pred) { foreach ($w in [TW]::Wins($pid0)) { if (& $pred $w) { return $w } } return $null }
   # главное окно — сразу за край экрана и фокус обратно
   $main = $null; $t0 = Get-Date
-  while (-not $main) { if ($p.HasExited) { throw 'TubesT закрылась' }; if (((Get-Date) - $t0).TotalSeconds -gt 90) { throw 'TubesT не открылась' }; Start-Sleep -Milliseconds 50; $main = Win { param($w) $w[2] -like 'T*Form*' -or $w[1] -like '*TubesT*' } }
+  while (-not $main) { if ($p.HasExited) { throw 'TubesT закрылась' }; if (((Get-Date) - $t0).TotalSeconds -gt 90) { throw 'TubesT не открылась' }; Start-Sleep -Milliseconds 50; $main = Win { param($w) $w[2] -eq 'TfrmTubest' } }
   $mh = [IntPtr]$main[0]; [TW]::Park($mh); [TW]::Focus($user, $pid0)
-  # журнал программы (TRichEdit): ждём «Completed» после открытия файла
-  $log = $null; $t0 = Get-Date; $done = $false; $txt = ''
+  # файл открыт, когда в заголовке окна появилось его имя («имя - TubesT-Lite…») и программа отвечает
+  $t0 = Get-Date; $done = $false; $hang = 0
   while (-not $done) {
     Start-Sleep -Milliseconds 500
     if ($p.HasExited) { throw 'TubesT закрылась' }
-    $w = Win { param($w) $w[1] -like ('*' + $name + '*') }; if ($w) { $mh = [IntPtr]$w[0] }
     [TW]::Park($mh); [TW]::Focus($user, $pid0)
     $d = Win { param($w) $w[2] -eq 'TMessageForm' -or $w[2] -eq '#32770' }; if ($d) { throw ('TubesT: ' + $d[1] + ' ' + (([TW]::Kids([IntPtr]$d[0]) | ForEach-Object { $_[1] }) -join ' ')) }
-    if (-not $log) { foreach ($k in [TW]::Kids($mh)) { if ($k[2] -like '*RichEdit*') { $log = [IntPtr]$k[0] } } }
-    if ($log) { $txt = [TW]::Text($log); $i = $txt.LastIndexOf('Open Files'); if ($i -ge 0 -and $txt.IndexOf('Completed', $i) -ge 0) { $done = $true } }
+    $p.Refresh(); if ($p.Responding) { $hang = 0 } else { $hang++ }
+    if ($hang -gt 240) { throw 'TubesT зависла на этом файле' }
+    $w = Win { param($w) $w[2] -eq 'TfrmTubest' }
+    if ($w -and $p.Responding -and ([string]$w[1]).Contains(' - TubesT')) { $done = $true }
     if (((Get-Date) - $t0).TotalMinutes -gt 20) { throw 'слишком долгий импорт' }
   }
-  if ($txt -match '(?i)does not match|error|fail') { $bad = ($txt.Substring($txt.LastIndexOf('Open Files')) -split "\r?\n" | Where-Object { $_ -match '(?i)does not match|error|fail' } | Select-Object -First 1); if ($bad) { throw ('TubesT: ' + $bad) } }
+  Start-Sleep -Milliseconds 1500
   Start-Sleep -Milliseconds 500
   # кнопка Export: группа «Locating the file», вторая кнопка
   $grp = $null; foreach ($k in [TW]::Kids($mh)) { if ($k[2] -eq 'TdxRibbonGroupBarControl' -and $k[1] -eq 'Locating the file') { $grp = [IntPtr]$k[0] } }

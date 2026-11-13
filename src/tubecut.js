@@ -180,7 +180,8 @@
   const pad8 = v => { const s = String(v); return s.length >= 8 ? s.slice(-8) : ' '.repeat(8 - s.length) + s; };
   const holl = s => s.length + 'H' + s;
   // parts: [{bytes, M, name}] → текст IGES (мм)
-  function buildIGES(parts, info) {
+  // запись IGES: emit(f1, f2, toks) по одной сущности, finish(info) — байты файла
+  function igesWriter() {
     // P пишется сразу в байты по ходу (на больших хлыстах строка целиком не помещается в память), D копится строками — он небольшой
     const line = (s, sec, n) => (s + ' '.repeat(72)).slice(0, 72) + sec + String(n).padStart(7, '0');
     const Dl = [], Pbytes = []; let pCount = 0, nEnt = 0, pBuf = [], pLen = 0;
@@ -195,25 +196,7 @@
       f1[1] = pad8(pstart); f2[3] = pad8(chunks.length);
       Dl.push(f1.join('') + 'D' + String(de).padStart(7, '0'), f2.join('') + 'D' + String(de + 1).padStart(7, '0'));
     };
-    for (const part of parts) {
-      const doc = readRaw(part.bytes);
-      const { ents, newXf, num } = placeIGES(doc, part.M);
-      const order = [...ents.values()].filter(e => !e.drop);
-      const base = nEnt; const map = new Map(); order.forEach((e, i) => map.set(e.de, 2 * (base + i) + 1));
-      const xfBase = base + order.length;
-      const shift = v => { v = ival(v); if (!v) return 0; const m = map.get(Math.abs(v)); return m ? (v < 0 ? -m : m) : 0; };
-      for (const e of order) {
-        const f1 = e.f1.slice(), f2 = e.f2.slice(), toks = e.toks;
-        for (const k of e.lay.ptr) if (k < toks.length) toks[k] = String(shift(toks[k]));
-        // ссылки из каталога: структура, тип линии, слой (отрицательные), вид, матрица, подпись, цвет (отрицательный)
-        for (const i of [2, 3, 4]) { const v = ival(f1[i]); if (v < 0) f1[i] = pad8(shift(v)); }
-        for (const i of [5, 7]) { const v = ival(f1[i]); if (v > 0) f1[i] = pad8(shift(v)); }
-        { const v = ival(f2[2]); if (v < 0) f2[2] = pad8(shift(v)); }
-        f1[6] = pad8(e.newXf !== undefined ? 2 * (xfBase + e.newXf) + 1 : e.xf ? shift(e.xf) : 0);
-        emit(f1, f2, toks); e.toks = null;
-      }
-      for (const m of newXf) emit([124, 0, 0, 0, 0, 0, 0, 0, '00000000'].map(pad8), [124, 0, 0, 0, 0, '', '', 'POSITION', 0].map(pad8), ['124', ...m.map(num)]);
-    }
+    const finish = info => {
     pFlush();
     const S = (info.comment || ['Raskladchik']).map((s, i) => line(s, 'S', i + 1));
     const d = new Date(); const ds = d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0') + '.' + String(d.getHours()).padStart(2, '0') + String(d.getMinutes()).padStart(2, '0') + String(d.getSeconds()).padStart(2, '0');
@@ -224,6 +207,31 @@
     let total = head.length + tail.length; for (const b of Pbytes) total += b.length;
     const out = new Uint8Array(total); let o = 0; out.set(head, o); o += head.length; for (const b of Pbytes) { out.set(b, o); o += b.length; } out.set(tail, o);
     return out;
+    };
+    return { emit, finish, count: () => nEnt };
+  }
+  function buildIGES(parts, info) {
+    const W = igesWriter();
+    for (const part of parts) {
+      const doc = readRaw(part.bytes);
+      const { ents, newXf, num } = placeIGES(doc, part.M);
+      const order = [...ents.values()].filter(e => !e.drop);
+      const base = W.count(); const map = new Map(); order.forEach((e, i) => map.set(e.de, 2 * (base + i) + 1));
+      const xfBase = base + order.length;
+      const shift = v => { v = ival(v); if (!v) return 0; const m = map.get(Math.abs(v)); return m ? (v < 0 ? -m : m) : 0; };
+      for (const e of order) {
+        const f1 = e.f1.slice(), f2 = e.f2.slice(), toks = e.toks;
+        for (const k of e.lay.ptr) if (k < toks.length) toks[k] = String(shift(toks[k]));
+        // ссылки из каталога: структура, тип линии, слой (отрицательные), вид, матрица, подпись, цвет (отрицательный)
+        for (const i of [2, 3, 4]) { const v = ival(f1[i]); if (v < 0) f1[i] = pad8(shift(v)); }
+        for (const i of [5, 7]) { const v = ival(f1[i]); if (v > 0) f1[i] = pad8(shift(v)); }
+        { const v = ival(f2[2]); if (v < 0) f2[2] = pad8(shift(v)); }
+        f1[6] = pad8(e.newXf !== undefined ? 2 * (xfBase + e.newXf) + 1 : e.xf ? shift(e.xf) : 0);
+        W.emit(f1, f2, toks); e.toks = null;
+      }
+      for (const m of newXf) W.emit([124, 0, 0, 0, 0, 0, 0, 0, '00000000'].map(pad8), [124, 0, 0, 0, 0, '', '', 'POSITION', 0].map(pad8), ['124', ...m.map(num)]);
+    }
+    return W.finish(info);
   }
 
   // ---------------------------------------------------------------- STEP
@@ -283,6 +291,6 @@
     return linesToBytes(headL.concat(lines, ['ENDSEC;', 'END-ISO-10303-21;']), '\n');
   }
 
-  root.TubeCut = { barMatrix, buildIGES, buildSTEP, _int: { readRaw, layout, placeIGES, compose, apP } };
+  root.TubeCut = { barMatrix, buildIGES, buildSTEP, igesWriter, pad8, _int: { readRaw, layout, placeIGES, compose, apP } };
   if (typeof module !== 'undefined') module.exports = root.TubeCut;
 })(typeof window !== 'undefined' ? window : globalThis);
