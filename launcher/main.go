@@ -345,7 +345,7 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		jsonOut(w, 200, map[string]string{"dir": d})
 	case "/api/hist/list", "/api/hist/save", "/api/hist/load", "/api/hist/delete", "/api/hist/open", "/api/hist/dir":
 		s.hist(w, r)
-	case "/api/openfiles", "/api/file", "/api/findfiles", "/api/proj/export", "/api/proj/import", "/api/savefile":
+	case "/api/openfiles", "/api/file", "/api/findfiles", "/api/locate", "/api/proj/export", "/api/proj/import", "/api/savefile":
 		s.files(w, r)
 	case "/api/tubest/check", "/api/tubest/status", "/api/tubest/start", "/api/tubest/stop":
 		s.tubestAPI(w, r)

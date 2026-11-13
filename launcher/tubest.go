@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 )
 
 type tubestJob struct {
@@ -69,11 +70,13 @@ func (s *server) tubestAPI(w http.ResponseWriter, r *http.Request) {
 		}
 		ents, _ := os.ReadDir(dir)
 		var files []string
+		nIgs := 0
 		for _, e := range ents {
 			n := e.Name()
 			if e.IsDir() || !strings.EqualFold(filepath.Ext(n), ".igs") {
 				continue
 			}
+			nIgs++
 			if _, err := os.Stat(filepath.Join(dir, strings.TrimSuffix(n, filepath.Ext(n))+".zzx")); err == nil {
 				continue // уже переведён — не трогаем
 			}
@@ -90,6 +93,16 @@ func (s *server) tubestAPI(w http.ResponseWriter, r *http.Request) {
 		tjob.mu.Unlock()
 		go func() {
 			for _, f := range files {
+				// строго по одной TubesT: прошлая должна закрыться (компьютер слабый)
+				for i := 0; i < 60 && tubestCount() > 0; i++ {
+					time.Sleep(time.Second)
+				}
+				if tubestCount() > 0 {
+					tjob.mu.Lock()
+					tjob.Errs = append(tjob.Errs, "TubesT не закрылась — остальные файлы не переведены")
+					tjob.mu.Unlock()
+					break
+				}
 				tjob.mu.Lock()
 				stop := tjob.Stop
 				tjob.Cur = filepath.Base(f)
@@ -111,7 +124,7 @@ func (s *server) tubestAPI(w http.ResponseWriter, r *http.Request) {
 			tjob.Running, tjob.Cur = false, ""
 			tjob.mu.Unlock()
 		}()
-		jsonOut(w, 200, map[string]any{"ok": true, "total": len(files)})
+		jsonOut(w, 200, map[string]any{"ok": true, "total": len(files), "igs": nIgs})
 	default:
 		http.NotFound(w, r)
 	}

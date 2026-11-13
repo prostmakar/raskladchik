@@ -1746,7 +1746,7 @@ async function zzxStart(){
   if(!$('#cutDoneTxt').textContent) $('#cutDoneTxt').textContent=st.cutDir;
   const r = await (await fetch('/api/tubest/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dir:st.cutDir})})).json().catch(e=>({error:e.message}));
   if(r.error){ zzxShow('.zzx не сделаны', r.error); $('#zzxGo').hidden=false; return; }
-  if(!r.total){ zzxShow('Все .zzx уже есть'); return; }
+  if(!r.total){ zzxShow(r.igs ? 'Все .zzx уже есть' : 'Нет .igs для TubesT', r.igs ? '' : 'TubesT открывает только IGES. Детали из STEP остаются .stp'); return; }
   $('#zzxStop').hidden=false; zzxShow(`TubesT: 0 из ${r.total} — не трогайте мышь и клавиатуру`);
   clearInterval(zzxPoll);
   zzxPoll=setInterval(async()=>{
@@ -2042,28 +2042,18 @@ window.__pdf = { lib: pdfLib, open: openPdf };
   projTag(); window.__by();
 
   // ----- перетащили файлы: Windows не говорит программе, откуда они — спросим папку и найдём их там -----
-  window.askWhere = function(files){
+  window.askWhere = async function(files){
     if(!API || !files || !files.length) return;
     const names = new Set(files.map(f=>f.name.toLowerCase()));
     const T = window.__app && window.__app.st, Sh = window.__sheet && window.__sheet.st;
     const need = [...(T?T.parts:[]), ...(Sh?Sh.parts:[])].filter(p => !p.path && p.file && names.has(p.file.toLowerCase()));
     if(!need.length) return;
-    const bar = $('#whereBar');
-    bar.innerHTML = `<span>Откуда файлы (${need.length})?</span><button class="btn small primary" id="whereOk">Указать папку…</button><button class="ic" id="whereNo" title="Не сейчас">✕</button>`;
-    bar.hidden = false;
-    $('#whereNo').onclick = () => { bar.hidden = true; };
-    $('#whereOk').onclick = async () => {
-      let start = ''; try{ start = localStorage.getItem('where.dir')||''; }catch(e){}
-      const r = await post('/api/pickdir', {start, prompt: 'Папка, откуда перетащили файлы (подпапки тоже проверю)'});
-      if(r.error){ alert(r.error); return; } if(!r.dir) return;
-      try{ localStorage.setItem('where.dir', r.dir); }catch(e){}
-      const f = await post('/api/findfiles', {dir: r.dir, files: files.map(x=>({name:x.name, size:x.size}))});
-      const found = f.found || {}; let n = 0;
-      for(const p of need){ const path = found[p.file.toLowerCase()]; if(path){ p.path = path; n++; } }
-      if(T) window.__app.save(); if(Sh) window.__sheet.save();
-      bar.innerHTML = `<span>${n===need.length ? 'Готово: все ' + n + ' путей запомнены.' : 'Нашёл ' + n + ' из ' + need.length}</span><button class="ic" id="whereNo2">✕</button>`;
-      $('#whereNo2').onclick = () => { bar.hidden = true; }; setTimeout(()=>{ bar.hidden = true; }, 6000);
-    };
+    // прошлые папки: откуда открывали и куда указывали
+    const dirs=[]; try{ for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(/^(open\.dir\.|where\.dir)/.test(k)){ const v=localStorage.getItem(k); if(v && !dirs.includes(v)) dirs.push(v); } } }catch(e){}
+    const f = await post('/api/locate', {dirs, files: files.map(x=>({name:x.name, size:x.size}))});
+    const found = f.found || {};
+    for(const p of need){ const path = found[p.file.toLowerCase()]; if(path){ p.path = path; try{ localStorage.setItem('where.dir', path.replace(/[\\/][^\\/]*$/,'')); }catch(e){} } }
+    if(T) window.__app.save(); if(Sh) window.__sheet.save();
   };
 
   // ----- тема: авто / светлая / тёмная -----

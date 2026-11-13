@@ -59,6 +59,43 @@ func (s *server) files(w http.ResponseWriter, r *http.Request) {
 		}
 		w.Header().Set("Content-Type", "application/octet-stream")
 		w.Write(b)
+	case "/api/locate": // перетащили файлы — сами ищем, откуда: открытые окна Проводника, рабочий стол, загрузки, документы, прошлые папки
+		if !isPost {
+			http.Error(w, "bad request", 400)
+			return
+		}
+		var req struct {
+			Dirs  []string
+			Files []struct {
+				Name string
+				Size int64
+			}
+		}
+		json.NewDecoder(io.LimitReader(r.Body, 4<<20)).Decode(&req)
+		want := map[string]int64{}
+		for _, f := range req.Files {
+			want[strings.ToLower(f.Name)] = f.Size
+		}
+		found := map[string]string{}
+		seen := map[string]bool{}
+		roots := append(explorerDirs(), req.Dirs...)
+		roots = append(roots, desktopDir(), downloadsDir(), documentsDir())
+		for i, root := range roots {
+			if root == "" || len(found) == len(want) {
+				continue
+			}
+			root = filepath.Clean(root)
+			if seen[strings.ToLower(root)] {
+				continue
+			}
+			seen[strings.ToLower(root)] = true
+			depth := 2
+			if i < len(roots)-3 {
+				depth = 3 // окна Проводника и прошлые папки — поглубже
+			}
+			findIn(root, depth, want, found, 30000)
+		}
+		jsonOut(w, 200, map[string]any{"found": found})
 	case "/api/findfiles": // где лежат перетащенные файлы: ищем по имени и размеру в выбранной папке (3 уровня вглубь)
 		if !isPost {
 			http.Error(w, "bad request", 400)
@@ -190,4 +227,33 @@ func (s *server) files(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.NotFound(w, r)
 	}
+}
+
+// поиск файлов по имени (и размеру, если известен) в папке не глубже depth
+func findIn(root string, depth int, want map[string]int64, found map[string]string, limit int) {
+	n := 0
+	filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		n++
+		if n > limit || len(found) == len(want) {
+			return filepath.SkipAll
+		}
+		if d.IsDir() {
+			if rel, _ := filepath.Rel(root, p); rel != "." && strings.Count(rel, string(os.PathSeparator)) >= depth-1 {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		k := strings.ToLower(d.Name())
+		if sz, ok := want[k]; ok {
+			if _, done := found[k]; !done {
+				if fi, e := d.Info(); e == nil && (sz <= 0 || fi.Size() == sz) {
+					found[k] = p
+				}
+			}
+		}
+		return nil
+	})
 }

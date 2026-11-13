@@ -4,6 +4,7 @@ package main
 
 import (
 	"encoding/base64"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -177,10 +178,7 @@ func tubestExe() string {
 	return ""
 }
 
-func tubestRunning() bool {
-	out, _ := runPS("@(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.ProcessName -like 'TubesT*' }).Count")
-	return strings.TrimSpace(out) != "" && strings.TrimSpace(out) != "0"
-}
+func tubestRunning() bool { return tubestCount() > 0 }
 
 // один IGES → .zzx рядом, не мешая работать: TubesT открывает файл из командной строки, окно сразу уводится за край экрана,
 // фокус возвращается обратно. Готовность — по журналу программы («Completed»). Дальше кнопка Export (сообщениями мыши в окно,
@@ -308,10 +306,9 @@ try {
   $t0 = Get-Date; $prev = -1; $zname = [IO.Path]::GetFileName($dst); $start = $p.StartTime
   while ($true) { Start-Sleep -Milliseconds 500
     if (Test-Path -LiteralPath $dst) { $len = (Get-Item -LiteralPath $dst).Length; if ($len -gt 0 -and $len -eq $prev) { break }; $prev = $len; continue }
-    $tw = Win { param($w) $w[1] -like ('*' + $zname + '*') }
-    if ($tw -and ((Get-Date) - $t0).TotalSeconds -gt 2) {
-      $f = Get-ChildItem -Path ([Environment]::GetFolderPath('MyDocuments')), ([Environment]::GetFolderPath('Desktop')), (Split-Path $src) -Filter $zname -Recurse -Depth 2 -ErrorAction SilentlyContinue | Where-Object { $_.LastWriteTime -ge $start } | Select-Object -First 1
-      if ($f) { Start-Sleep -Milliseconds 800; L ('moved from ' + $f.FullName); Move-Item -LiteralPath $f.FullName -Destination $dst; continue }
+    if (((Get-Date) - $t0).TotalSeconds -gt 3) {
+      $f = Get-ChildItem -Path ([Environment]::GetFolderPath('MyDocuments')), ([Environment]::GetFolderPath('Desktop')), (Split-Path $src) -Filter '*.zzx' -Recurse -Depth 1 -ErrorAction SilentlyContinue | Where-Object { $_.LastWriteTime -ge $start -and $_.FullName -ne $dst -and $_.Length -gt 0 } | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+      if ($f) { Start-Sleep -Milliseconds 1500; L ('moved from ' + $f.FullName); Move-Item -LiteralPath $f.FullName -Destination $dst; continue }
     }
     $d = Win { param($w) $w[2] -eq 'TMessageForm' -or ($w[2] -eq '#32770' -and [IntPtr]$w[0] -ne $sh) }; if ($d) { throw ('TubesT: ' + $d[1] + ' ' + (([TW]::Kids([IntPtr]$d[0]) | ForEach-Object { $_[1] }) -join ' ')) }
     if (((Get-Date) - $t0).TotalSeconds -gt 180) { throw 'файл .zzx не появился' } }
@@ -344,3 +341,37 @@ func tubestConvert(exe, src string) (string, error) {
 type errorString string
 
 func (e errorString) Error() string { return string(e) }
+
+// папки, открытые сейчас в окнах Проводника (оттуда обычно и перетаскивают)
+func explorerDirs() []string {
+	out, err := runPS("$s=New-Object -ComObject Shell.Application; foreach($w in $s.Windows()){ try { $p=$w.Document.Folder.Self.Path; if($p -and (Test-Path -LiteralPath $p)){ $p } } catch {} }")
+	if err != nil {
+		return nil
+	}
+	var r []string
+	for _, l := range strings.Split(strings.ReplaceAll(out, "\r", ""), "\n") {
+		if l = strings.TrimSpace(l); l != "" {
+			r = append(r, l)
+		}
+	}
+	return r
+}
+
+func downloadsDir() string {
+	out, err := runPS("(New-Object -ComObject Shell.Application).NameSpace('shell:Downloads').Self.Path")
+	if p := strings.TrimSpace(out); err == nil && p != "" {
+		return p
+	}
+	if h, e := os.UserHomeDir(); e == nil {
+		return filepath.Join(h, "Downloads")
+	}
+	return ""
+}
+
+// сколько TubesT запущено сейчас
+func tubestCount() int {
+	out, _ := runPS("@(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.ProcessName -like 'TubesT*' }).Count")
+	n := 0
+	fmt.Sscan(strings.TrimSpace(out), &n)
+	return n
+}

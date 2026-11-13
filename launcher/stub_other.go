@@ -69,3 +69,12 @@ func tubestConvert(exe, src string) (string, error) {
 	}
 	return filepath.Base(dst), os.WriteFile(dst, b, 0o644)
 }
+
+func explorerDirs() []string {
+	if d := os.Getenv("EXPLORER_DIR"); d != "" {
+		return []string{d}
+	}
+	return nil
+}
+func downloadsDir() string { return os.Getenv("DOWNLOADS_DIR") }
+func tubestCount() int     { return 0 }
