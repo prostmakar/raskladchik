@@ -5,6 +5,12 @@
 
   // ---------------------------------------------------------------- матрицы 3×4 (строки: [r00 r01 r02 t0, r10 ..., r20 ...])
   const I3 = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0];
+  function inv(A) { // обратная к [R|t] (R — поворот с масштабом)
+    const [a, b, c, , d, e, f, , g, h, k] = A, det = a * (e * k - f * h) - b * (d * k - f * g) + c * (d * h - e * g);
+    const R = [(e * k - f * h) / det, (c * h - b * k) / det, (b * f - c * e) / det, (f * g - d * k) / det, (a * k - c * g) / det, (c * d - a * f) / det, (d * h - e * g) / det, (b * g - a * h) / det, (a * e - b * d) / det];
+    const t = [A[3], A[7], A[11]];
+    return [R[0], R[1], R[2], -(R[0] * t[0] + R[1] * t[1] + R[2] * t[2]), R[3], R[4], R[5], -(R[3] * t[0] + R[4] * t[1] + R[5] * t[2]), R[6], R[7], R[8], -(R[6] * t[0] + R[7] * t[1] + R[8] * t[2])];
+  }
   function compose(A, B) { // A∘B
     const r = [];
     for (let i = 0; i < 3; i++) {
@@ -157,8 +163,8 @@
       const t = e.toks, I = k => ival(t[k]);
       const coord = [100, 104, 106, 108, 110, 116, 122, 123, 126, 128, 502].includes(e.type);
       if (e.xf) {
-        if (!coord) throw new Error('вложенные преобразования (124) у сущности ' + e.type + ' пока не поддерживаются');
-        e.newXf = needXf(compose(Q, chain(e.xf))); continue;
+        // составная сущность (120, 144, 102…): её части уже сдвинуты на Q, поэтому своя матрица — в новых координатах: Q·X·Q⁻¹
+        e.newXf = needXf(coord ? compose(Q, chain(e.xf)) : compose(compose(Q, chain(e.xf)), inv(Q))); continue;
       }
       if (COORD_XF.has(e.type) || (e.type === 106 && I(1) === 1)) { e.newXf = needXf(Q); continue; }
       switch (e.type) {
