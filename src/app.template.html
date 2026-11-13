@@ -476,7 +476,7 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
 <div class="wrap" id="appTube" hidden>
   <header>
     <h1><button class="home" data-go="home" title="К выбору: трубы или лист">←</button>Длина <span>реза</span> трубы <span class="projtag"></span></h1>
-    <div class="cutbar"><button class="btn" id="cutBtn">Раскрой трубы <em>ТЕСТ</em></button><button class="btn" id="cutDir" hidden title="">📂 Папка раскроя</button><button class="btn" id="cutZzx" hidden title="Перевести файлы раскроя в .zzx через TubesT">→ .zzx</button></div>
+    <div class="cutbar"><button class="btn" id="cutBtn">Раскрой трубы <em>ТЕСТ</em></button><button class="btn" id="cutDir" hidden title="">📂 Папка раскроя</button><button class="btn" id="cutZzx" hidden title="Сделать .zzx для TubePro (через TubesT)">→ TubePro .zzx</button></div>
     <div class="tabs" id="tabs">
       <button data-t="parts" class="on">Детали<span class="cnt" id="cntParts"></span></button>
       <button data-t="nest">Раскладка по хлыстам</button>
@@ -691,7 +691,7 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
   <div class="dlg-h"><h2>Раскрой сохранён</h2><button class="ic" id="cutDoneClose">✕</button></div>
   <div class="dlg-b"><div id="cutDoneTxt" style="word-break:break-all"></div><div class="meta" id="cutDoneLack" style="margin-top:8px"></div>
   <div class="zzx" id="zzxBox" hidden><b id="zzxTxt"></b><div class="meta" id="zzxErr"></div></div>
-  <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" id="zzxStop" hidden>Остановить</button><button class="btn" id="zzxGo" hidden>Сделать .zzx</button><button class="btn primary" id="cutDoneOpen">📂 Открыть папку</button></div></div>
+  <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" id="zzxStop" hidden>Остановить</button><button class="btn" id="zzxGo" hidden>Сделать .zzx для TubePro</button><button class="btn primary" id="cutDoneOpen">📂 Открыть папку</button></div></div>
 </div></div>
 <div class="modal center" id="setm" hidden><div class="dlg">
   <div class="dlg-h"><h2>Настройки</h2><button class="ic" id="setClose">✕</button></div>
@@ -1732,13 +1732,13 @@ async function zzxStart(){
   const r = await (await fetch('/api/tubest/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dir:st.cutDir})})).json().catch(e=>({error:e.message}));
   if(r.error){ zzxShow('.zzx не сделаны', r.error); $('#zzxGo').hidden=false; return; }
   if(!r.total){ zzxShow(r.igs ? 'Все .zzx уже есть' : 'Нет .igs для TubesT'); return; }
-  $('#zzxStop').hidden=false; zzxShow(`TubesT: 0 из ${r.total} — не трогайте мышь и клавиатуру, TubesT будет открываться сама`);
+  $('#zzxStop').hidden=false; zzxShow(`.zzx для TubePro: 0 из ${r.total} — не трогайте мышь и клавиатуру, TubesT будет открываться сама`);
   clearInterval(zzxPoll);
   zzxPoll=setInterval(async()=>{
     const s = await (await fetch('/api/tubest/status')).json().catch(()=>null); if(!s) return;
-    if(s.running){ zzxShow(`TubesT: ${s.done} из ${s.total} — не трогайте мышь и клавиатуру`, s.cur); return; }
+    if(s.running){ zzxShow(`.zzx для TubePro: ${s.done} из ${s.total} — не трогайте мышь и клавиатуру`, s.cur); return; }
     clearInterval(zzxPoll); $('#zzxStop').hidden=true;
-    const ok=s.made.length; zzxShow(ok===s.total ? `Готово: ${ok} .zzx` : `Сделано .zzx: ${ok} из ${s.total}`, s.errs.join('\n'));
+    const ok=s.made.length; zzxShow(ok===s.total ? `Готово: ${ok} .zzx для TubePro — в этой же папке` : `Сделано .zzx: ${ok} из ${s.total}`, s.errs.join('\n'));
     if(ok<s.total) $('#zzxGo').hidden=false;
   }, 1500);
 }
