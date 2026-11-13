@@ -1654,6 +1654,7 @@ async function cutExport(){
   btn.disabled=true; const html0=btn.innerHTML; btn.textContent='Готовлю…';
   try{
     const lack=new Map(); // id детали -> почему нет
+    const igsOf=new Map(); // id STEP-детали -> она же в IGES
     // исходников нет ни в памяти, ни по пути (перетаскивали, а папку не указали) — спросим папку и найдём по имени
     if(Paths.api){
       const miss=[];
@@ -1675,17 +1676,17 @@ async function cutExport(){
       let b=srcBytes.get(p.id);
       if(!b && p.path && Paths.api){ try{ b=await Paths.read(p.path); srcBytes.set(p.id,b); }catch(e){} }
       if(!b){ lack.set(p.id,'нет исходного файла'+(p.path?' по пути '+p.path:'')); continue; }
-      if(!p.res || !p.res.fr){ try{ p.res = XTCut.analyzeModel(p.fmt==='IGES'?IGES.toModel(b):STEP.toModel(b)); }catch(e){ lack.set(p.id, e.message); } }
+      if(!p.res || !p.res.fr){ try{ p.res = XTCut.analyzeModel(p.fmt==='IGES'?IGES.toModel(b):STEP.toModel(b)); }catch(e){ lack.set(p.id, e.message); continue; } }
+      if(p.fmt==='STEP' && !igsOf.has(p.id)){ try{ igsOf.set(p.id, STEP2IGES.convert(b)); }catch(e){ lack.set(p.id, 'STEP не перевёлся в IGES: '+e.message); } }
       await new Promise(r=>setTimeout(r,0));
     }
     save(); showTab('nest');
-    const nb=st.nest, rep=[];
+    const nb=st.nest;
     // план: какие хлысты, какие файлы
     const plan=[]; let bi=0;
     for(const g of lastNest) for(const pt of g.R.patterns){ bi++;
       const it3=pt.items.filter(it=>{ const p=byId(it.p.key); return p && p.src==='xt' && !lack.has(p.id); });
-      if(it3.some(it=>byId(it.p.key).fmt!=='STEP')) plan.push({g,pt,bi,fmt:'IGES'});
-      if(it3.some(it=>byId(it.p.key).fmt==='STEP')) plan.push({g,pt,bi,fmt:'STEP'});
+      if(it3.length) plan.push({g,pt,bi});
     }
     if(!plan.length){ alert('Не получилось ни одного файла:\n'+[...lack].map(([id,w])=>{ const p=byId(id); return (p?p.name:id)+' — '+w; }).join('\n')); return; }
     const nameOf = (g,pt,bi) => `${String(bi).padStart(2,"0")} ${g.pk} ${Math.round(pt.S||g.S)} мм${pt.stock?' отход':''} x${pt.n}`;
@@ -1701,31 +1702,15 @@ async function cutExport(){
       const r = await (await fetch('/api/savebin?dir='+encodeURIComponent(dir)+'&name='+encodeURIComponent(name),{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:bytes})).json();
       if(r.error) throw new Error(r.error);
     };
-    rep.push('Раскрой труб — '+(window.fileBase?window.fileBase():''), 'Сохранено: '+new Date().toLocaleString('ru-RU'), '');
-    let done=0, lastG=null;
-    for(const {g,pt,bi,fmt:ff} of plan){
+    let done=0;
+    for(const {g,pt,bi} of plan){
       btn.textContent=`Сохраняю ${++done} из ${plan.length}…`; await new Promise(r=>setTimeout(r,0));
       const nm=nameOf(g,pt,bi), S=pt.S||g.S;
       const list=[];
-      for(const it of pt.items){ const p=byId(it.p.key); if(!p || p.src!=='xt' || lack.has(p.id) || (p.fmt==='STEP')!==(ff==='STEP')) continue; list.push({bytes:srcBytes.get(p.id), M:TubeCut.barMatrix(p.res.fr, it.p.g, it.o, it.s)}); }
+      for(const it of pt.items){ const p=byId(it.p.key); if(!p || p.src!=='xt' || lack.has(p.id)) continue; list.push({bytes: p.fmt==='STEP' ? igsOf.get(p.id) : srcBytes.get(p.id), M:TubeCut.barMatrix(p.res.fr, it.p.g, it.o, it.s)}); }
       const info = { comment: ['Raskladchik v__APP_VER__', `Bar ${bi}: ${tr(g.pk)}, L=${S} mm, x${pt.n}${pt.stock?' (offcut)':''}`, `Gap ${g.K} mm, start trim ${nb.t0} mm, clamp ${nb.t1} mm`, `Parts: ${list.length}`] };
-      const twin = plan.some(q=>q.bi===bi && q.fmt!==ff);
-      const bytes = ff==='STEP' ? TubeCut.buildSTEP(list, Object.assign({file: tr(nm)+'.stp'}, info)) : TubeCut.buildIGES(list, Object.assign({file: tr(nm)+'.igs'}, info));
-      await put(nm+(ff==='STEP'?(twin?' (STEP)':'')+'.stp':'.igs'), bytes);
+      await put(nm+'.igs', TubeCut.buildIGES(list, Object.assign({file: tr(nm)+'.igs'}, info)));
     }
-    // отчёт
-    bi=0;
-    for(const g of lastNest){
-      rep.push('=== '+g.pk+' — хлыст '+fmt(g.S,0)+' мм, между деталями '+fmt(g.K,1)+' мм, обрезка начала '+fmt(nb.t0,0)+' мм, зажим '+fmt(nb.t1,0)+' мм');
-      for(const pt of g.R.patterns){ bi++;
-        const miss=pt.items.map(it=>{ const p=byId(it.p.key); const why=!p?'деталь удалена':p.src!=='xt'?'нет 3D (чертёж или вручную)':lack.get(p.id); return why?it.p.name+' — '+why:''; }).filter(Boolean);
-        rep.push('', nameOf(g,pt,bi)+(plan.some(q=>q.bi===bi)?'':'  — файл не создан'), ...pt.items.map(it=>`  с ${fmt(it.s+Math.min(...it.o.lo),1)} мм: ${it.p.name} — ${fmt(it.p.g.L,1)} мм${it.o.flip?' (развёрнута)':''}`), `  остаток ${fmt(pt.rest+nb.t1,0)} мм`);
-        if(miss.length) rep.push('  нет в файле: '+[...new Set(miss)].join('; '));
-      }
-      if(g.R.too.length) rep.push('Не помещаются в хлыст: '+[...new Set(g.R.too.map(t=>t.name))].join(', '));
-      rep.push('');
-    }
-    await put('Раскрой.txt', new TextEncoder().encode('\ufeff'+rep.join('\r\n')));
     if(!Paths.api) return;
     st.cutDir=dir; save(); cutDirBtn();
     $('#cutDoneTxt').textContent = `${plan.length} ${plan.length===1?'файл':plan.length<5?'файла':'файлов'} — ${dir}`;
@@ -1746,8 +1731,8 @@ async function zzxStart(){
   if(!$('#cutDoneTxt').textContent) $('#cutDoneTxt').textContent=st.cutDir;
   const r = await (await fetch('/api/tubest/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dir:st.cutDir})})).json().catch(e=>({error:e.message}));
   if(r.error){ zzxShow('.zzx не сделаны', r.error); $('#zzxGo').hidden=false; return; }
-  if(!r.total){ zzxShow(r.igs ? 'Все .zzx уже есть' : 'Нет .igs для TubesT', r.igs ? '' : 'TubesT открывает только IGES. Детали из STEP остаются .stp'); return; }
-  $('#zzxStop').hidden=false; zzxShow(`TubesT: 0 из ${r.total} — не трогайте мышь и клавиатуру`);
+  if(!r.total){ zzxShow(r.igs ? 'Все .zzx уже есть' : 'Нет .igs для TubesT'); return; }
+  $('#zzxStop').hidden=false; zzxShow(`TubesT: 0 из ${r.total} — не трогайте мышь и клавиатуру, TubesT будет открываться сама`);
   clearInterval(zzxPoll);
   zzxPoll=setInterval(async()=>{
     const s = await (await fetch('/api/tubest/status')).json().catch(()=>null); if(!s) return;
@@ -1796,6 +1781,9 @@ window.__pdf = { lib: pdfLib, open: openPdf };
 </script>
 <script>
 /*TUBECUT*/
+</script>
+<script>
+/*STEP2IGES*/
 </script>
 <script>
 /*DXFEDIT*/

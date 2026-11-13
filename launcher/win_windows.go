@@ -180,9 +180,9 @@ func tubestExe() string {
 
 func tubestRunning() bool { return tubestCount() > 0 }
 
-// один IGES → .zzx рядом, не мешая работать: TubesT открывает файл из командной строки, окно сразу уводится за край экрана,
-// фокус возвращается обратно. Готовность — по журналу программы («Completed»). Дальше кнопка Export (сообщениями мыши в окно,
-// без клавиатуры и без фокуса), в окне сохранения имя пишется прямо в поле и жмётся «Сохранить». Потом TubesT закрывается.
+// один IGES → .zzx рядом. Просто и надёжно: TubesT открывает файл из командной строки и выходит на передний план,
+// дальше Alt → «2» → Enter («Сохранить как» на панели быстрого доступа). Клавиши уходят только если впереди именно TubesT.
+// В окне сохранения путь вписывается через UI Automation, «Сохранить» — им же. Потом TubesT закрывается.
 const tubestPS = `
 $ErrorActionPreference='Stop'
 trap { try { Add-Content -LiteralPath (Join-Path $env:TEMP 'Raskladchik_tubest.log') -Value ('ERR ' + $_.Exception.Message) -Encoding UTF8 } catch {}; Write-Output ('ERR:' + $_.Exception.Message); exit 1 }
@@ -190,23 +190,16 @@ Add-Type -TypeDefinition @"
 using System; using System.Runtime.InteropServices; using System.Text; using System.Collections.Generic;
 public class TW {
   public delegate bool EP(IntPtr h, IntPtr l);
-  [StructLayout(LayoutKind.Sequential)] public struct RECT { public int L, T, R, B; }
   [DllImport("user32.dll")] static extern bool EnumWindows(EP p, IntPtr l);
-  [DllImport("user32.dll")] static extern bool EnumChildWindows(IntPtr h, EP p, IntPtr l);
   [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
   [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] static extern int GetWindowText(IntPtr h, StringBuilder s, int n);
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] static extern int GetClassName(IntPtr h, StringBuilder s, int n);
-  [DllImport("user32.dll")] public static extern int GetDlgCtrlID(IntPtr h);
   [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+  [DllImport("user32.dll")] public static extern bool BringWindowToTop(IntPtr h);
   [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int c);
-  [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int w, int hh, uint f);
-  [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
-  [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr h, uint m, IntPtr w, IntPtr l);
-  [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern IntPtr SendMessage(IntPtr h, uint m, IntPtr w, string l);
-  [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern IntPtr SendMessage(IntPtr h, uint m, IntPtr w, StringBuilder l);
-  [DllImport("user32.dll")] public static extern IntPtr SendMessage(IntPtr h, uint m, IntPtr w, IntPtr l);
+  [DllImport("user32.dll")] static extern void keybd_event(byte vk, byte sc, uint fl, UIntPtr ex);
   [DllImport("user32.dll")] static extern bool AttachThreadInput(uint a, uint b, bool on);
   [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
   static string Txt(IntPtr h) { var t = new StringBuilder(512); GetWindowText(h, t, 512); return t.ToString(); }
@@ -216,109 +209,87 @@ public class TW {
     EnumWindows((h, l) => { uint p; GetWindowThreadProcessId(h, out p); if (p == pid && IsWindowVisible(h)) r.Add(new object[] { h, Txt(h), Cls(h) }); return true; }, IntPtr.Zero);
     return r;
   }
-  public static List<object[]> Kids(IntPtr w) {
-    var r = new List<object[]>();
-    EnumChildWindows(w, (h, l) => { r.Add(new object[] { h, Txt(h), Cls(h), GetDlgCtrlID(h) }); return true; }, IntPtr.Zero);
-    return r;
+  public static uint FgPid() { uint p; GetWindowThreadProcessId(GetForegroundWindow(), out p); return p; }
+  // вывести окно вперёд: Windows не даёт это фоновой программе — обходим нажатием Alt и присоединением к потоку активного окна
+  public static bool Front(IntPtr h, uint pid) {
+    for (int i = 0; i < 6; i++) {
+      if (FgPid() == pid) return true;
+      IntPtr fg = GetForegroundWindow(); uint x; uint a = GetCurrentThreadId(), b = GetWindowThreadProcessId(fg, out x);
+      keybd_event(0x12, 0, 0, UIntPtr.Zero); keybd_event(0x12, 0, 2, UIntPtr.Zero);
+      AttachThreadInput(a, b, true); ShowWindow(h, 3); BringWindowToTop(h); SetForegroundWindow(h); AttachThreadInput(a, b, false);
+      System.Threading.Thread.Sleep(300);
+    }
+    return FgPid() == pid;
   }
-  public static string Text(IntPtr h) { int n = (int)SendMessage(h, 0x0E, IntPtr.Zero, IntPtr.Zero); var sb = new StringBuilder(n + 2); SendMessage(h, 0x0D, (IntPtr)(n + 1), sb); return sb.ToString(); }
-  // окно за край экрана, под все остальные, без активации
-  public static void Park(IntPtr h) { ShowWindow(h, 4); SetWindowPos(h, (IntPtr)1, -20000, -20000, 1920, 1040, 0x10); }
-  // вернуть фокус окну пользователя (через присоединение к потоку текущего активного окна — иначе Windows не даёт)
-  // только если фокус сейчас у TubesT (pid): пользователь мог уйти в другую программу — туда не лезем
-  public static void Focus(IntPtr h, uint tpid) {
-    if (h == IntPtr.Zero) return; IntPtr fg = GetForegroundWindow(); if (fg == h) return; uint pid;
-    GetWindowThreadProcessId(fg, out pid); if (tpid != 0 && pid != tpid) return;
-    uint a = GetCurrentThreadId(), b = GetWindowThreadProcessId(fg, out pid);
+  public static void Back(IntPtr h) {
+    if (h == IntPtr.Zero) return; IntPtr fg = GetForegroundWindow(); uint x; uint a = GetCurrentThreadId(), b = GetWindowThreadProcessId(fg, out x);
     AttachThreadInput(a, b, true); SetForegroundWindow(h); AttachThreadInput(a, b, false);
   }
-  public static void Click(IntPtr h, int x, int y) {
-    IntPtr lp = (IntPtr)((y << 16) | (x & 0xFFFF));
-    PostMessage(h, 0x200, IntPtr.Zero, lp); System.Threading.Thread.Sleep(80);
-    PostMessage(h, 0x201, (IntPtr)1, lp); System.Threading.Thread.Sleep(80);
-    PostMessage(h, 0x202, IntPtr.Zero, lp);
-  }
+  // клавиша — только если впереди TubesT; иначе ничего не жмём
+  public static bool Combo(byte mod, byte vk, uint pid) { if (FgPid() != pid) return false; keybd_event(mod, 0, 0, UIntPtr.Zero); keybd_event(vk, 0, 0, UIntPtr.Zero); System.Threading.Thread.Sleep(40); keybd_event(vk, 0, 2, UIntPtr.Zero); keybd_event(mod, 0, 2, UIntPtr.Zero); return true; }
+  public static bool Key(byte vk, uint pid) { if (FgPid() != pid) return false; keybd_event(vk, 0, 0, UIntPtr.Zero); System.Threading.Thread.Sleep(40); keybd_event(vk, 0, 2, UIntPtr.Zero); return true; }
 }
 "@
-Add-Type -AssemblyName UIAutomationClient,UIAutomationTypes
 $src = __SRC__; $exe = __EXE__
 $logf = Join-Path $env:TEMP 'Raskladchik_tubest.log'
 function L($m) { try { Add-Content -LiteralPath $logf -Value ((Get-Date).ToString('HH:mm:ss.fff') + ' ' + $m) -Encoding UTF8 } catch {} }
 L ('=== ' + $src)
 $dst = [IO.Path]::ChangeExtension($src, '.zzx')
-$name = [IO.Path]::GetFileName($src)
 $user = [TW]::GetForegroundWindow()
 $p = Start-Process -FilePath $exe -ArgumentList ('"' + $src + '"') -PassThru
 try {
   $pid0 = [uint32]$p.Id
   function Win($pred) { foreach ($w in [TW]::Wins($pid0)) { if (& $pred $w) { return $w } } return $null }
-  # главное окно — сразу за край экрана и фокус обратно
-  $main = $null; $t0 = Get-Date
-  while (-not $main) { if ($p.HasExited) { throw 'TubesT закрылась' }; if (((Get-Date) - $t0).TotalSeconds -gt 90) { throw 'TubesT не открылась' }; Start-Sleep -Milliseconds 50; $main = Win { param($w) $w[2] -eq 'TfrmTubest' } }
-  $mh = [IntPtr]$main[0]; [TW]::Park($mh); [TW]::Focus($user, $pid0)
-  # файл открыт, когда в заголовке окна появилось его имя («имя - TubesT-Lite…») и программа отвечает
-  $t0 = Get-Date; $done = $false; $hang = 0
-  while (-not $done) {
+  # файл открыт: в заголовке «имя - TubesT…», программа отвечает
+  $t0 = Get-Date; $main = $null; $hang = 0
+  while ($true) {
     Start-Sleep -Milliseconds 500
     if ($p.HasExited) { throw 'TubesT закрылась' }
-    [TW]::Park($mh); [TW]::Focus($user, $pid0)
-    $d = Win { param($w) $w[2] -eq 'TMessageForm' -or $w[2] -eq '#32770' }; if ($d) { throw ('TubesT: ' + $d[1] + ' ' + (([TW]::Kids([IntPtr]$d[0]) | ForEach-Object { $_[1] }) -join ' ')) }
+    $d = Win { param($w) $w[2] -eq 'TMessageForm' -or $w[2] -eq '#32770' }; if ($d) { throw ('TubesT: ' + $d[1]) }
     $p.Refresh(); if ($p.Responding) { $hang = 0 } else { $hang++ }
     if ($hang -gt 240) { throw 'TubesT зависла на этом файле' }
-    $w = Win { param($w) $w[2] -eq 'TfrmTubest' }
-    if ($w -and $p.Responding -and ([string]$w[1]).Contains(' - TubesT')) { $done = $true }
+    $main = Win { param($w) $w[2] -eq 'TfrmTubest' }
+    if ($main -and $p.Responding -and ([string]$main[1]).Contains(' - TubesT')) { break }
     if (((Get-Date) - $t0).TotalMinutes -gt 20) { throw 'слишком долгий импорт' }
   }
+  L ('loaded: ' + $main[1])
   Start-Sleep -Milliseconds 1500
-  Start-Sleep -Milliseconds 500
-  # кнопка Export: группа «Locating the file», вторая кнопка
-  $grp = $null; foreach ($k in [TW]::Kids($mh)) { if ($k[2] -eq 'TdxRibbonGroupBarControl' -and $k[1] -eq 'Locating the file') { $grp = [IntPtr]$k[0] } }
-  if (-not $grp) { L ('kids: ' + (([TW]::Kids($mh) | ForEach-Object { $_[2] + ':' + $_[1] }) -join '; ')); throw 'не нашёл кнопку Export' }
-  $r = New-Object TW+RECT; [void][TW]::GetWindowRect($grp, [ref]$r); L ('loaded; group ' + $r.L + ',' + $r.T + ' ' + ($r.R - $r.L) + 'x' + ($r.B - $r.T))
-  $save = $null; $mainH = $mh
-  foreach ($pt in @(@(70, 36), @(70, 30), @(72, 44), @(70, 36))) {
-    if ($save) { break }
-    [TW]::Click($grp, $pt[0], $pt[1]); L ('click ' + $pt[0] + ',' + $pt[1])
-    $t0 = Get-Date
-    while (-not $save -and ((Get-Date) - $t0).TotalSeconds -lt 6) { Start-Sleep -Milliseconds 200; $save = Win { param($w) [IntPtr]$w[0] -ne $mainH -and $w[2] -ne 'TApplication' } }
+  $mh = [IntPtr]$main[0]; $save = $null
+  for ($try = 0; $try -lt 3 -and -not $save; $try++) {
+    if (-not [TW]::Front($mh, $pid0)) { L 'не вышла вперёд'; Start-Sleep -Milliseconds 800; continue }
+    Start-Sleep -Milliseconds 400
+    $ok = [TW]::Key(0x1B, $pid0); Start-Sleep -Milliseconds 300
+    $ok = $ok -and [TW]::Key(0x12, $pid0); Start-Sleep -Milliseconds 700
+    $ok = $ok -and [TW]::Key(0x32, $pid0); Start-Sleep -Milliseconds 900
+    $ok = $ok -and [TW]::Key(0x0D, $pid0)
+    L ('keys ' + $ok)
+    $t1 = Get-Date
+    while (-not $save -and ((Get-Date) - $t1).TotalSeconds -lt 8) { Start-Sleep -Milliseconds 200; $save = Win { param($w) $w[2] -eq '#32770' } }
+    if (-not $save) { [void][TW]::Key(0x1B, $pid0); [void][TW]::Key(0x1B, $pid0) }
   }
-  L ('windows: ' + (([TW]::Wins($pid0) | ForEach-Object { $_[2] + ':' + $_[1] }) -join '; '))
   if (-not $save) { throw 'не открылось окно сохранения' }
-  $sh = [IntPtr]$save[0]; [TW]::SetWindowPos($sh, [IntPtr]1, -20000, -20000, 0, 0, 0x15) | Out-Null; [TW]::Focus($user, $pid0)
-  Start-Sleep -Milliseconds 400
-  # поле имени файла: через UI Automation (подходит и старому, и новому окну сохранения)
-  $ae = [Windows.Automation.AutomationElement]::FromHandle($sh)
-  $edits = $ae.FindAll([Windows.Automation.TreeScope]::Descendants, (New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::ControlTypeProperty, [Windows.Automation.ControlType]::Edit)))
-  L ('edits: ' + (($edits | ForEach-Object { $_.Current.AutomationId + '=' + $_.Current.Name }) -join '; '))
-  $edit = $null
-  foreach ($e in $edits) { if ($e.Current.AutomationId -eq '1001') { $edit = $e } }
-  if (-not $edit) { foreach ($e in $edits) { if ($e.Current.AutomationId -eq '1148' -or $e.Current.AutomationId -eq '1152') { $edit = $e } } }
-  if (-not $edit -and $edits.Count) { $edit = $edits[0] }
-  if (-not $edit) { throw 'нет поля имени файла' }
-  $ok = $false
-  try { $edit.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern).SetValue($dst); $ok = $true } catch { L ('SetValue: ' + $_.Exception.Message) }
-  if (-not $ok) { [TW]::SendMessage([IntPtr]$edit.Current.NativeWindowHandle, 0x0C, [IntPtr]::Zero, $dst) | Out-Null }
-  Start-Sleep -Milliseconds 300
-  try { L ('value: ' + $edit.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern).Current.Value) } catch {}
-  $btn = $ae.FindFirst([Windows.Automation.TreeScope]::Descendants, (New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::AutomationIdProperty, '1')))
-  if ($btn) { try { $btn.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke(); L 'invoke save' } catch { L ('invoke: ' + $_.Exception.Message); [TW]::PostMessage($sh, 0x111, [IntPtr]1, [IntPtr]::Zero) | Out-Null } }
-  else { [TW]::PostMessage($sh, 0x111, [IntPtr]1, [IntPtr]::Zero) | Out-Null; L 'IDOK' }
-  # ждём файл; если TubesT сохранила в свою папку (заголовок окна стал *.zzx) — найдём и перенесём к .igs
-  $t0 = Get-Date; $prev = -1; $zname = [IO.Path]::GetFileName($dst); $start = $p.StartTime
+  Start-Sleep -Milliseconds 600
+  # в окне сохранения курсор уже в поле «Имя файла»: полный путь — через буфер обмена (Ctrl+A, Ctrl+V, Enter)
+  $clip = $null; try { $clip = Get-Clipboard -Raw } catch {}
+  try {
+    Set-Clipboard -Value $dst; Start-Sleep -Milliseconds 200
+    if (-not [TW]::Front([IntPtr]$save[0], $pid0)) { throw 'окно сохранения не вышло вперёд' }
+    if (-not [TW]::Combo(0x11, 0x41, $pid0)) { throw 'фокус ушёл из TubesT' }; Start-Sleep -Milliseconds 200
+    if (-not [TW]::Combo(0x11, 0x56, $pid0)) { throw 'фокус ушёл из TubesT' }; Start-Sleep -Milliseconds 400
+    if (-not [TW]::Key(0x0D, $pid0)) { throw 'фокус ушёл из TubesT' }
+    L 'path pasted'
+  } finally { Start-Sleep -Milliseconds 500; if ($clip -ne $null) { try { Set-Clipboard -Value $clip } catch {} } }
+  $t0 = Get-Date; $prev = -1
   while ($true) { Start-Sleep -Milliseconds 500
     if (Test-Path -LiteralPath $dst) { $len = (Get-Item -LiteralPath $dst).Length; if ($len -gt 0 -and $len -eq $prev) { break }; $prev = $len; continue }
-    if (((Get-Date) - $t0).TotalSeconds -gt 3) {
-      $f = Get-ChildItem -Path ([Environment]::GetFolderPath('MyDocuments')), ([Environment]::GetFolderPath('Desktop')), (Split-Path $src) -Filter '*.zzx' -Recurse -Depth 1 -ErrorAction SilentlyContinue | Where-Object { $_.LastWriteTime -ge $start -and $_.FullName -ne $dst -and $_.Length -gt 0 } | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-      if ($f) { Start-Sleep -Milliseconds 1500; L ('moved from ' + $f.FullName); Move-Item -LiteralPath $f.FullName -Destination $dst; continue }
-    }
-    $d = Win { param($w) $w[2] -eq 'TMessageForm' -or ($w[2] -eq '#32770' -and [IntPtr]$w[0] -ne $sh) }; if ($d) { throw ('TubesT: ' + $d[1] + ' ' + (([TW]::Kids([IntPtr]$d[0]) | ForEach-Object { $_[1] }) -join ' ')) }
-    if (((Get-Date) - $t0).TotalSeconds -gt 180) { throw 'файл .zzx не появился' } }
+    $d = Win { param($w) $w[2] -eq 'TMessageForm' -or ($w[2] -eq '#32770' -and [IntPtr]$w[0] -ne [IntPtr]$save[0]) }; if ($d) { throw ('TubesT: ' + $d[1]) }
+    if (((Get-Date) - $t0).TotalSeconds -gt 120) { throw 'файл .zzx не появился' } }
   Start-Sleep -Milliseconds 800
   L 'ok'
   [IO.Path]::GetFileName($dst)
 } finally {
   if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue }
-  [TW]::Focus($user, $pid0)
+  [TW]::Back($user)
 }
 `
 
