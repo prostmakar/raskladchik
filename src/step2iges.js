@@ -280,6 +280,17 @@
     return W.finish(info || { comment: ['Raskladchik: STEP to IGES'] });
   }
 
-  root.STEP2IGES = { convert, _int: { arcN, subN, insertKnot, evalN, revolve } };
+  // та же ли геометрия: те же рёбра (число, длина), то же место в пространстве. null — совпало, иначе — что не так
+  function sameShape(a, b) {
+    const stat = m => { let L = 0; const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+      for (const e of m.edges) { L += e.g.len || 0; for (const p of e.g.pts) for (let i = 0; i < 3; i++) { if (p[i] < lo[i]) lo[i] = p[i]; if (p[i] > hi[i]) hi[i] = p[i]; } }
+      return { n: m.edges.length, f: m.faces.size, L, lo, hi }; };
+    const A = stat(a), B = stat(b);
+    if (A.f !== B.f) return 'граней ' + B.f + ' вместо ' + A.f;
+    if (Math.abs(A.L - B.L) > 0.5 + 1e-3 * A.L) return 'длина рёбер ' + B.L.toFixed(1) + ' вместо ' + A.L.toFixed(1);
+    for (let i = 0; i < 3; i++) if (Math.abs(A.lo[i] - B.lo[i]) > 0.05 || Math.abs(A.hi[i] - B.hi[i]) > 0.05) return 'деталь сдвинулась';
+    return null;
+  }
+  root.STEP2IGES = { convert, sameShape, _int: { arcN, subN, insertKnot, evalN, revolve } };
   if (typeof module !== 'undefined') module.exports = root.STEP2IGES;
 })(typeof window !== 'undefined' ? window : globalThis);

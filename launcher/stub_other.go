@@ -6,6 +6,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -78,3 +79,5 @@ func explorerDirs() []string {
 }
 func downloadsDir() string { return os.Getenv("DOWNLOADS_DIR") }
 func tubestCount() int     { return 0 }
+
+func hideWindow(c *exec.Cmd) {}

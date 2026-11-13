@@ -84,6 +84,9 @@ func runPS(script string) (string, error) {
 	return strings.TrimPrefix(string(out), "\ufeff"), err
 }
 
+// запуск без чёрного окна
+func hideWindow(c *exec.Cmd) { c.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000} }
+
 func psq(s string) string { return "'" + strings.ReplaceAll(s, "'", "''") + "'" }
 
 // окно «Открыть» Windows: полные пути выбранных файлов

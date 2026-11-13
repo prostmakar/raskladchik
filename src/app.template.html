@@ -689,7 +689,7 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
 <div class="wherebar" id="whereBar" hidden></div>
 <div class="modal center" id="cutDone" hidden><div class="dlg">
   <div class="dlg-h"><h2>Раскрой сохранён</h2><button class="ic" id="cutDoneClose">✕</button></div>
-  <div class="dlg-b"><div id="cutDoneTxt" style="word-break:break-all"></div><div class="meta" id="cutDoneLack" style="margin-top:8px"></div>
+  <div class="dlg-b"><div id="cutDoneTxt" style="word-break:break-all"></div><div class="meta" id="cutDoneLack" style="margin-top:8px;white-space:pre-line"></div>
   <div class="zzx" id="zzxBox" hidden><b id="zzxTxt"></b><div class="meta" id="zzxErr"></div></div>
   <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" id="zzxStop" hidden>Остановить</button><button class="btn" id="zzxGo" hidden>Перевести в .zzx</button><button class="btn primary" id="cutDoneOpen">📂 Открыть папку</button></div></div>
 </div></div>
@@ -1651,6 +1651,27 @@ function cutDirBtn(){ const b=$('#cutDir'); b.hidden = !st.cutDir || !Paths.api;
 async function openCutDir(){ if(!st.cutDir) return; try{ const r = await fetch('/api/open',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dir:st.cutDir})}); if(!r.ok) alert('Папка не найдена:\n'+st.cutDir); }catch(e){ alert(e.message); } }
 $('#cutDir').addEventListener('click', openCutDir);
 const b64 = u8 => { let s=''; for(let i=0;i<u8.length;i+=8192) s+=String.fromCharCode.apply(null,u8.subarray(i,i+8192)); return btoa(s); };
+// STEP → IGES: Mayo (Open CASCADE), при первом раскрое скачивается сам; запасной — свой переводчик.
+// Результат сверяется с исходным STEP (те же грани, рёбра и место) — иначе деталь в раскрой не идёт.
+let mayoState=null; // null — не проверяли, true — есть, строка — почему нет
+async function stepToIges(b, say){
+  const ref=STEP.toModel(b);
+  const check=igs=>{ try{ return STEP2IGES.sameShape(ref, IGES.toModel(igs)); }catch(e){ return e.message; } };
+  let why='';
+  if(Paths.api && mayoState!==false){
+    try{
+      if(mayoState===null){ const c=await (await fetch('/api/mayo/check')).json();
+        if(!c.ok){ say('Скачиваю переводчик STEP (45 МБ)…'); const r=await (await fetch('/api/mayo/install',{method:'POST'})).json(); mayoState = r.error ? r.error : true; } else mayoState=true; }
+      if(mayoState===true){
+        const resp=await fetch('/api/mayo/convert',{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:b});
+        if((resp.headers.get('Content-Type')||'').includes('json')) why=(await resp.json()).error||'ошибка';
+        else { const igs=new Uint8Array(await resp.arrayBuffer()); const bad=check(igs); if(!bad) return {igs}; why='Mayo: '+bad; }
+      } else why=mayoState;
+    }catch(e){ why=e.message; }
+  }
+  try{ const igs=STEP2IGES.convert(b); const bad=check(igs); if(bad) return {err:'STEP не перевёлся в IGES: '+bad}; return {igs, own:true, why}; }
+  catch(e){ return {err:'STEP не перевёлся в IGES: '+e.message+(why?' ('+why+')':'')}; }
+}
 async function cutExport(){
   const btn=$('#cutBtn'); if(btn.disabled) return;
   const solid = st.parts.filter(p=>p.src==='xt' && !p.err);
@@ -1659,6 +1680,7 @@ async function cutExport(){
   try{
     const lack=new Map(); // id детали -> почему нет
     const igsOf=new Map(); // id STEP-детали -> она же в IGES
+    const ownConv=[]; // переведены запасным переводчиком
     // исходников нет ни в памяти, ни по пути (перетаскивали, а папку не указали) — спросим папку и найдём по имени
     if(Paths.api){
       const miss=[];
@@ -1681,7 +1703,7 @@ async function cutExport(){
       if(!b && p.path && Paths.api){ try{ b=await Paths.read(p.path); srcBytes.set(p.id,b); }catch(e){} }
       if(!b){ lack.set(p.id,'нет исходного файла'+(p.path?' по пути '+p.path:'')); continue; }
       if(!p.res || !p.res.fr){ try{ p.res = XTCut.analyzeModel(p.fmt==='IGES'?IGES.toModel(b):STEP.toModel(b)); }catch(e){ lack.set(p.id, e.message); continue; } }
-      if(p.fmt==='STEP' && !igsOf.has(p.id)){ try{ igsOf.set(p.id, STEP2IGES.convert(b)); }catch(e){ lack.set(p.id, 'STEP не перевёлся в IGES: '+e.message); } }
+      if(p.fmt==='STEP' && !igsOf.has(p.id)){ const r=await stepToIges(b, n=>{ btn.textContent=n; }); if(r.err) lack.set(p.id, r.err); else { igsOf.set(p.id, r.igs); if(r.own) ownConv.push(p.name); } }
       await new Promise(r=>setTimeout(r,0));
     }
     save(); showTab('nest');
@@ -1718,7 +1740,7 @@ async function cutExport(){
     if(!Paths.api) return;
     st.cutDir=dir; save(); cutDirBtn();
     $('#cutDoneTxt').textContent = `${plan.length} ${plan.length===1?'файл':plan.length<5?'файла':'файлов'} — ${dir}`;
-    $('#cutDoneLack').textContent = lack.size ? 'Без 3D: '+[...lack].map(([id,w])=>{ const p=byId(id); return (p?p.name:id)+' ('+w+')'; }).join(', ') : '';
+    $('#cutDoneLack').textContent = (lack.size ? 'Без 3D: '+[...lack].map(([id,w])=>{ const p=byId(id); return (p?p.name:id)+' ('+w+')'; }).join(', ') : '') + (ownConv.length ? (lack.size?'\n':'')+'STEP через запасной переводчик (проверьте в TubesT): '+ownConv.join(', ') : '');
     $('#zzxBox').hidden=true; $('#zzxGo').hidden=!tubest;
     $('#cutDone').hidden=false;
   }catch(e){ alert('Ошибка: '+e.message); }

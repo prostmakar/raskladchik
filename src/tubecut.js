@@ -224,7 +224,8 @@
       const order = [...ents.values()].filter(e => !e.drop);
       const base = W.count(); const map = new Map(); order.forEach((e, i) => map.set(e.de, 2 * (base + i) + 1));
       const xfBase = base + order.length;
-      const shift = v => { v = ival(v); if (!v) return 0; const m = map.get(Math.abs(v)); return m ? (v < 0 ? -m : m) : 0; };
+      // чётный номер — вторая строка той же сущности (так пишет КОМПАС), считаем ссылкой на неё
+      const shift = v => { v = ival(v); if (!v) return 0; const a = Math.abs(v); const m = map.get(a) || (a % 2 === 0 ? map.get(a - 1) : 0); return m ? (v < 0 ? -m : m) : 0; };
       for (const e of order) {
         const f1 = e.f1.slice(), f2 = e.f2.slice(), toks = e.toks;
         for (const k of e.lay.ptr) if (k < toks.length) toks[k] = String(shift(toks[k]));

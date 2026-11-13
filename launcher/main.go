@@ -349,6 +349,8 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.files(w, r)
 	case "/api/tubest/check", "/api/tubest/status", "/api/tubest/start", "/api/tubest/stop":
 		s.tubestAPI(w, r)
+	case "/api/mayo/check", "/api/mayo/install", "/api/mayo/convert":
+		s.mayoAPI(w, r)
 	case "/api/open":
 		if r.Method != http.MethodPost || !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
 			http.Error(w, "bad request", 400)
