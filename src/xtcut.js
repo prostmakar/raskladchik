@@ -365,7 +365,12 @@
       const inRange = (iv, a, b) => { const x0 = cyc(iv[0]), L = iv[1] - iv[0]; const A = cyc(a); const off = cyc(x0 - A); return off + L <= cyc(b - a) + 1e-6; };
       for (const f of outerF) if (f.iv && (inRange(f.iv, openGap.s0 - w, openGap.s0) || inRange(f.iv, openGap.s1, openGap.s1 + w))) f.tip = true;
       const legs = outerF.filter(f => !f.tip && f.surf.kind === 'plane');
-      const ns = []; for (const f of legs) { const n = norm(f.surf.n); if (!ns.some(m => Math.abs(dot(m, n)) > 0.999 && dot(m, n) > 0)) ns.push(n); }
+      // нормаль полки — наружу от центра сечения (в IGES/STEP направление нормали у плоскости бывает любым)
+      const hc = [H.reduce((s2, p) => s2 + p[0], 0) / H.length, H.reduce((s2, p) => s2 + p[1], 0) / H.length];
+      const outN = f => { let n = norm(f.surf.n); const P2 = f.pts.map(to2); if (!P2.length) return n;
+        const fc = [P2.reduce((s2, p) => s2 + p[0], 0) / P2.length, P2.reduce((s2, p) => s2 + p[1], 0) / P2.length];
+        if ((fc[0] - hc[0]) * dot(n, U) + (fc[1] - hc[1]) * dot(n, V) < 0) n = mul(n, -1); return n; };
+      const ns = []; for (const f of legs) { const n = outN(f); if (!ns.some(m => Math.abs(dot(m, n)) > 0.999 && dot(m, n) > 0)) ns.push(n); }
       kind = ns.length >= 3 ? 'channel' : 'angle';
     }
     const pathLen = PER - (openGap ? openGap.len : 0) - outerF.filter(f => f.tip && f.iv).reduce((s2, f) => s2 + (f.iv[1] - f.iv[0]), 0);
