@@ -289,7 +289,9 @@
     const sk = isFinite(sharedKerf) && sharedKerf >= 0 ? Math.min(sharedKerf, kerf) : Math.min(0.3, kerf);
     const end = S - trimEnd;
     const too = pieces.filter(p => p.g.L > end - trimStart + 1e-6);
-    const list = pieces.filter(p => !(p.g.L > end - trimStart + 1e-6)).map(p => Object.assign({}, p, { ors: orientations(p.g) }));
+    // need — сколько деталь самое меньшее добавит к хлысту (с учётом скосов): хлыст, где места меньше, не проверяем
+    const list = pieces.filter(p => !(p.g.L > end - trimStart + 1e-6)).map(p => { const ors = orientations(p.g); return Object.assign({}, p, { ors, need: Math.min(...ors.map(o => Math.max(...o.ro) - Math.max(...o.lo))) }); });
+    const minNeed = list.reduce((m, p) => Math.min(m, p.need), Infinity);
     const place = (bar, p, look = true) => { // best orientation appended at bar end
       let best = null;
       for (const o of p.ors) {
@@ -321,18 +323,26 @@
       }
       return best;
     };
+    // хлысты с одинаковым концом (последняя деталь, её разворот и место) дальше ведут себя одинаково —
+    // проверяем такой класс один раз, а не каждый хлыст (иначе на десятках тысяч деталей минуты)
+    const sigOf = b => { const l = b.items[b.items.length - 1]; return l ? l.p.key + '#' + l.o.op + '#' + l.s.toFixed(6) : ''; };
     const run = (order, strategy) => {
-      const bars = [];
+      const bars = [], cls = new Map(); // sig → {bars: [], end}
       for (const p of order) {
-        let pick = null, pickBar = null;
-        for (const b of bars) {
-          const r = place(b, p); if (!r) continue;
-          if (strategy === 'ff') { pick = r; pickBar = b; break; }
-          const rest = end - r.e;
-          if (!pick || rest < end - pick.e) { pick = r; pickBar = b; }
+        let pick = null, pickC = null;
+        for (const [sg, c] of cls) {
+          const room = end - c.end;
+          if (room < minNeed - 1e-6) { cls.delete(sg); continue; } // больше ничего не влезет
+          if (room < p.need - 1e-6) continue;
+          const r = place(c.bars[0], p); if (!r) continue;
+          if (strategy === 'ff') { pick = r; pickC = c; break; }
+          if (!pick || end - r.e < end - pick.e) { pick = r; pickC = c; }
         }
-        if (!pick) { pickBar = { items: [], end: trimStart }; bars.push(pickBar); pick = place(pickBar, p); }
-        pickBar.items.push({ p, s: pick.s, o: pick.o, shared: pick.shared }); pickBar.end = Math.max(pickBar.end, pick.e);
+        let bar;
+        if (pickC) { bar = pickC.bars.shift(); if (!pickC.bars.length) cls.delete(sigOf(bar)); }
+        else { bar = { items: [], end: trimStart }; bars.push(bar); pick = place(bar, p); }
+        bar.items.push({ p, s: pick.s, o: pick.o, shared: pick.shared }); bar.end = Math.max(bar.end, pick.e);
+        const sg = sigOf(bar); let c = cls.get(sg); if (!c) { c = { bars: [], end: bar.end }; cls.set(sg, c); } c.bars.push(bar);
       }
       return bars;
     };
@@ -363,7 +373,9 @@
     let shared = 0;
     for (const L of units) {
       if (!rest.length) { unused.push(L); continue; }
-      const R = nestShapes(rest, L, kerf, trimStart, trimEnd, sharedKerf);
+      // на один отрезок больше L/длина штук одной детали не встанет — остальные не перебираем
+      const cnt = new Map(), sub = rest.filter(p => { const m = Math.floor(L / Math.max(1, p.g.L * 0.3)) + 2, c = cnt.get(p.key) || 0; if (c >= m) return false; cnt.set(p.key, c + 1); return true; });
+      const R = nestShapes(sub, L, kerf, trimStart, trimEnd, sharedKerf);
       if (!R.patterns.length) { unused.push(L); continue; }
       // самый заполненный отрезок
       const pt = R.patterns.slice().sort((a, b) => a.rest - b.rest || b.items.length - a.items.length)[0];
