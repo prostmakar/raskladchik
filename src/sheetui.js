@@ -515,6 +515,15 @@
     return { groups: [...groups.values()].filter(g => g.list.length).sort((a, b) => (a.mat > b.mat ? 1 : a.mat < b.mat ? -1 : (+a.t || 0) - (+b.t || 0))), skipped };
   }
 
+  // свой зазор и свой лист у группы «материал + толщина» (пусто — как в общих настройках)
+  const perOf = key => (st.cfg.per && st.cfg.per[key]) || {};
+  function optFor(base, key) {
+    const o = Object.assign({}, base), p = perOf(key);
+    if (num(p.gap) >= 0 && String(p.gap).trim() !== '') o.gap = num(p.gap);
+    const w = num(p.W), h = num(p.H);
+    if (w > 0 && h > 0) { o.W = Math.max(w, h); o.H = Math.min(w, h); }
+    return o;
+  }
   let worker = null, running = false, cancelled = false;
   async function runNest() {
     if (running) { stopNest(); return; }
@@ -538,15 +547,40 @@
       const g = groups[gi];
       const parts = g.list.map(p => ({ id: p.id, qty: p.qty, polys: p.polys, area: p.area, cut: p.cut, pierces: p.pierces, rect: p.rect }));
       const lbl = groups.length > 1 ? groupLabel(g.mat, g.t) + ' — ' : '';
-      const r = await nestOne(parts, opt, (f, t) => prog((gi + f) / groups.length, lbl + (t || '')));
+      const go = optFor(opt, g.key);
+      const r = await nestOne(parts, go, (f, t) => prog((gi + f) / groups.length, lbl + (t || '')));
       if (!r) break;
-      out.push(Object.assign({}, g, { r }));
+      out.push(Object.assign({}, g, { r, opt: go }));
     }
     running = false; $('#nRun').textContent = 'Разложить'; $('#nRun').classList.add('primary'); $('#nProg').hidden = true;
     if (cancelled || out.length < groups.length) return;
     st.result = { groups: out, skipped, opt, asIs: asIs && need.length, cfg: JSON.parse(JSON.stringify(c)), when: new Date() };
     st.dirty = false; renderResult();
   }
+  // поменяли зазор или лист у группы — перекладываем только её
+  async function renestGroup(key) {
+    if (!st.result || running) return;
+    const { groups } = nestParts(); const g = groups.find(x => x.key === key);
+    const gi = st.result.groups.findIndex(x => x.key === key);
+    if (!g || gi < 0) { st.dirty = true; save(); renderNestState(); return; }
+    const go = optFor(st.result.opt, key);
+    running = true; cancelled = false; $('#nProg').hidden = false; prog(0, groupLabel(g.mat, g.t) + ' — раскладка…');
+    $('#nRun').textContent = 'Остановить'; $('#nRun').classList.remove('primary');
+    const parts = g.list.map(p => ({ id: p.id, qty: p.qty, polys: p.polys, area: p.area, cut: p.cut, pierces: p.pierces, rect: p.rect }));
+    const r = await nestOne(parts, go, (f, t) => prog(f, groupLabel(g.mat, g.t) + ' — ' + (t || '')));
+    running = false; $('#nRun').textContent = 'Разложить'; $('#nRun').classList.add('primary'); $('#nProg').hidden = true;
+    if (!r || cancelled) return;
+    st.result.groups[gi] = Object.assign({}, g, { r, opt: go });
+    save(); renderResult();
+  }
+  $('#nOut').addEventListener('change', e => {
+    const el = e.target.closest('[data-per]'); if (!el) return;
+    const [key, k] = el.dataset.per.split('§'); const v = el.value.trim();
+    if (v !== '' && !(num(v) >= 0)) { toast('Введите число'); return; }
+    st.cfg.per = st.cfg.per || {}; const p = Object.assign({}, st.cfg.per[key]); if (v === '') delete p[k]; else p[k] = v;
+    if (Object.keys(p).length) st.cfg.per[key] = p; else delete st.cfg.per[key];
+    save(); renestGroup(key);
+  });
   function nestOne(parts, opt, onProg) {
     return new Promise(resolve => {
       const viaPage = () => { if (!window.Nest2D) (0, eval)($('#src-nest').textContent); setTimeout(() => { try { resolve(window.Nest2D.nest(parts, opt, null)); } catch (e) { toast('Ошибка раскладки: ' + esc(e.message)); resolve(null); } }, 30); };
@@ -575,6 +609,7 @@
   function summary() {
     const R = st.result; const lead = +st.cfg.lead || 0; const opt = R.opt;
     const groups = R.groups.map(g => {
+      const opt = g.opt || R.opt;
       const byPid = new Map(g.list.map(p => [p.id, p]));
       let sheets = 0, parts = 0, cut = 0, pier = 0, shared = 0, area = 0, pm = 0, a1 = 0, af = 0, afOk = true;
       for (const s of g.r.sheets) {
@@ -584,10 +619,11 @@
       const rho = MATS[g.mat] ? MATS[g.mat].rho : 7850;
       const metal = g.t > 0 ? opt.W * opt.H * g.t * rho * 1e-9 * sheets : NaN;
       let used = 0; for (const s of g.r.sheets) { const u = usedPart(s, opt, g); used += (u ? u.mass : (g.t > 0 ? opt.W * opt.H * g.t * rho * 1e-9 : NaN)) * s.count; }
-      return { g, byPid, metalUsed: used, sheets, parts, cut, pier, shared, util: sheets ? area / (opt.W * opt.H * sheets) : 0, partsMass: pm, a1, af, afOk, metal, total: (cut + pier * lead) / 1000 };
+      return { g, opt, byPid, metalUsed: used, sheets, parts, cut, pier, shared, util: sheets ? area / (opt.W * opt.H * sheets) : 0, partsMass: pm, a1, af, afOk, metal, total: (cut + pier * lead) / 1000 };
     });
     const T = groups.reduce((a, x) => ({ sheets: a.sheets + x.sheets, parts: a.parts + x.parts, cut: a.cut + x.cut, pier: a.pier + x.pier, shared: a.shared + x.shared, pm: a.pm + (x.partsMass || 0), a1: a.a1 + x.a1, af: a.af + x.af, afOk: a.afOk && x.afOk, metal: a.metal + (isFinite(x.metal) ? x.metal : 0), metalUsed: a.metalUsed + (isFinite(x.metalUsed) ? x.metalUsed : 0), metalOk: a.metalOk && isFinite(x.metal) }), { sheets: 0, parts: 0, cut: 0, pier: 0, shared: 0, pm: 0, a1: 0, af: 0, afOk: true, metal: 0, metalUsed: 0, metalOk: true });
     T.total = (T.cut + T.pier * lead) / 1000; T.lead = lead;
+    T.sizes = [...new Set(groups.map(x => fmt(x.opt.W, 0) + ' × ' + fmt(x.opt.H, 0)))];
     return { groups, T, opt };
   }
   const sqm = v => fmt(v / 1e6, v < 1e5 ? 4 : v < 1e6 ? 3 : 2) + ' м²';
@@ -595,8 +631,7 @@
   const areaTxt = (one, full, ok) => ok && full ? `${sqm(full)}` : sqm(one);
   // использованная часть листа: от начала до линии отреза (за крайней деталью + зазор/край); null — лист занят почти целиком
   function usedPart(s, opt, g) {
-    const cfg = st.result && st.result.cfg || {};
-    const cutX = Math.min(opt.W, s.usedX + Math.max(+cfg.gap || 0, +opt.margin || 0, 5));
+    const cutX = Math.min(opt.W, s.usedX + Math.max(+opt.gap || 0, +opt.margin || 0, 5));
     if (opt.W - cutX < 50) return null;
     const rho = MATS[g.mat] ? MATS[g.mat].rho : 7850;
     return { cutX, len: cutX, rest: opt.W - cutX, mass: g.t > 0 ? cutX * opt.H * g.t * rho * 1e-9 : NaN, restMass: g.t > 0 ? (opt.W - cutX) * opt.H * g.t * rho * 1e-9 : NaN };
@@ -614,7 +649,7 @@
     let html = `<div class="ncard sum">
       <div class="cutbig"><span>Длина реза${multi ? ' — весь заказ' : ''}</span><b>${fmt(T.total, 2)} м</b><em>${fmt(T.cut / 1000, 2)} м по контурам${T.lead ? ` + врезки ${T.pier.toLocaleString('ru-RU')} × ${fmt(T.lead, 1)} мм = ${fmt(T.pier * T.lead / 1000, 2)} м` : ''}${T.shared ? ` (общий рез сэкономил ${fmt(T.shared / 1000, 2)} м)` : ''}</em></div>
       <div class="sumgrid">
-        <div><span>Листов</span><b>${T.sheets}</b><em>${fmt(opt.W, 0)} × ${fmt(opt.H, 0)} мм</em></div>
+        <div><span>Листов</span><b>${T.sheets}</b><em>${T.sizes.join(', ')} мм</em></div>
         <div><span>Деталей</span><b>${T.parts}</b></div>
         <div><span>Площадь покрытия</span><b>${areaTxt(T.a1, T.af, T.afOk)}</b><em>${T.afOk && T.af ? 'полная, обе стороны + торцы · одна сторона ' + sqm(T.a1) : 'одна сторона (задайте толщину для полной)'}</em></div>
         <div><span>Вес деталей</span><b>${T.pm ? fmt(T.pm, 1) + ' кг' : '—'}</b><em>металла ${T.metal ? '≈ ' + fmt(T.metal, 0) + ' кг' + (T.metalOk ? '' : '+') : '—'}${T.metal && T.metalUsed && T.metal - T.metalUsed > 0.5 ? ' · по факту (без остатков листов) ≈ ' + fmt(T.metalUsed, 0) + ' кг' : ''}</em></div>
@@ -623,10 +658,12 @@
       ${R.skipped.length ? `<div class="nwarn">Пропущены (ошибка чтения): ${R.skipped.map(esc).join(', ')}</div>` : ''}
     </div>`;
     groups.forEach((x, gi) => {
-      const g = x.g;
+      const g = x.g, opt = x.opt, per = perOf(g.key), base = st.result.opt;
+      const fld = (k, lbl, val, ph) => `<div class="fld"><span>${lbl}</span><input type="text" inputmode="decimal" class="nm${val !== undefined && val !== '' ? ' own' : ''}" data-per="${esc(g.key)}§${k}" value="${esc(val === undefined ? '' : val)}" placeholder="${esc(ph)}"></div>`;
       const unpl = g.r.unplaced.map(u => { const p = x.byPid.get(u.id); return `${esc(p ? p.name : u.id)} — ${u.n} шт (${esc(u.reason)})`; });
       const gases = [...new Set(g.list.map(p => p.gas))].map(k => GASES[k] ? GASES[k].short : k).join(', ');
-      html += `<div class="ghead"><h2>${esc(groupLabel(g.mat, g.t))}</h2><div class="stats"><span>листов <b>${x.sheets}</b></span><span>рез <b class="acc">${fmt(x.total, 2)} м</b></span><span>деталей <b>${x.parts}</b></span><span>покрытие <b>${areaTxt(x.a1, x.af, x.afOk)}</b></span><span>вес деталей <b>${x.partsMass ? fmt(x.partsMass, 1) + ' кг' : '—'}</b></span><span>металл <b>${isFinite(x.metal) ? fmt(x.metal, 0) + ' кг' : '—'}</b></span><span>газ: ${esc(gases)}</span></div></div>`;
+      html += `<div class="ghead"><h2>${esc(groupLabel(g.mat, g.t))}</h2><div class="stats"><span>листов <b>${x.sheets}</b></span><span>рез <b class="acc">${fmt(x.total, 2)} м</b></span><span>деталей <b>${x.parts}</b></span><span>покрытие <b>${areaTxt(x.a1, x.af, x.afOk)}</b></span><span>вес деталей <b>${x.partsMass ? fmt(x.partsMass, 1) + ' кг' : '—'}</b></span><span>металл <b>${isFinite(x.metal) ? fmt(x.metal, 0) + ' кг' : '—'}</b></span><span>газ: ${esc(gases)}</span></div>
+        <div class="nflds gper">${fld('gap', 'Между деталями, мм', per.gap, fmt(base.gap, 1))}${fld('W', 'Лист, мм', per.W, fmt(base.W, 0))}<span class="gx">×</span>${fld('H', '&nbsp;', per.H, fmt(base.H, 0))}</div></div>`;
       if (unpl.length) html += `<div class="ncard"><div class="nwarn">Не разложены: ${unpl.join('; ')}</div></div>`;
       let no = 0;
       g.r.sheets.forEach((s, si) => {
@@ -636,7 +673,7 @@
         const uses = s.items.map(it => { const p = x.byPid.get(it.id); const m = it.m; return `<use data-id="${esc(it.id)}" href="#${defId(gi, it.id)}" transform="matrix(${m.map(v => +v.toFixed(4)).join(' ')})" fill="${p.color}" fill-opacity=".22" stroke="${p.color}"><title>${esc(p.name)}</title></use>`; }).join('');
         const cnt = new Map(); for (const it of s.items) cnt.set(it.id, (cnt.get(it.id) || 0) + 1);
         html += `<div class="ncard"><div class="nhead"><h3>Лист ${s.count > 1 ? first + '–' + no : first}${s.count > 1 ? ` <span class="rep">×${s.count} одинаковых</span>` : ''}</h3>
-          <div class="stats"><span>деталей <b>${s.items.length}</b></span><span>рез <b class="acc">${fmt(cutS, 2)} м</b>${s.count > 1 ? ' на лист' : ''}</span><span>использование <b>${fmt(s.util * 100, 1)}%</b></span>${u ? `<span class="used">используется <b>${fmt(u.len, 0)} × ${fmt(opt.H, 0)} мм</b>${isFinite(u.mass) ? ` · <b>${fmt(u.mass, 1)} кг</b>` : ''}</span><span>остаток <b>${fmt(u.rest, 0)} × ${fmt(opt.H, 0)}</b>${isFinite(u.restMass) ? ' · ' + fmt(u.restMass, 1) + ' кг' : ''}</span>` : ''}${s.shared ? `<span class="gain">общий рез <b>−${fmt(s.shared / 1000, 2)} м</b></span>` : ''}</div></div>
+          <div class="stats"><span>деталей <b>${s.items.length}</b></span><span>рез <b class="acc">${fmt(cutS, 2)} м</b>${s.count > 1 ? ' на лист' : ''}</span>${u ? `<span class="used">используется <b>${fmt(u.len, 0)} × ${fmt(opt.H, 0)} мм</b>${isFinite(u.mass) ? ` · <b>${fmt(u.mass, 1)} кг</b>` : ''}</span><span>остаток <b>${fmt(u.rest, 0)} × ${fmt(opt.H, 0)}</b>${isFinite(u.restMass) ? ' · ' + fmt(u.restMass, 1) + ' кг' : ''}</span>` : ''}${s.shared ? `<span class="gain">общий рез <b>−${fmt(s.shared / 1000, 2)} м</b></span>` : ''}</div></div>
           <div class="sheetbox" data-sheet="${gi}:${si}" title="Нажмите — детали на этом листе"><svg viewBox="${-opt.W * 0.005} ${-opt.H * 1.005} ${opt.W * 1.01} ${opt.H * 1.01}" preserveAspectRatio="xMidYMid meet"><g transform="scale(1,-1)">
             <rect x="0" y="0" width="${opt.W}" height="${opt.H}" class="sh"/>
             ${opt.margin > 0 ? `<rect x="${opt.margin}" y="${opt.margin}" width="${Math.max(0, opt.W - 2 * opt.margin)}" height="${Math.max(0, opt.H - 2 * opt.margin)}" class="shm"/>` : ''}
@@ -653,7 +690,7 @@
   let shv = null;
   function openSheet(gi, si) {
     if (!st.result) return;
-    const { groups, T, opt } = summary(); const x = groups[gi]; if (!x) return; const s = x.g.r.sheets[si]; if (!s) return;
+    const { groups, T } = summary(); const x = groups[gi]; if (!x) return; const s = x.g.r.sheets[si]; if (!s) return; const opt = x.opt;
     let first = 1; for (let k = 0; k < si; k++) first += x.g.r.sheets[k].count; const last = first + s.count - 1;
     $('#shm').hidden = false;
     $('#shTitle').textContent = `${groupLabel(x.g.mat, x.g.t)} — лист ${s.count > 1 ? first + '–' + last : first}`;
@@ -666,7 +703,6 @@
       ${kv('Таких листов', '×' + s.count)}
       ${kv('Деталей на листе', s.items.length)}
       ${kv('Рез на лист', fmt(cutS, 2) + ' м', 'acc')}
-      ${kv('Использование', fmt(s.util * 100, 1) + '%')}
       ${(u => u ? kv('Используется листа', `${fmt(u.len, 0)} × ${fmt(opt.H, 0)} мм${isFinite(u.mass) ? ' · ' + fmt(u.mass, 1) + ' кг' : ''}`, 'acc') + kv('Остаток листа', `${fmt(u.rest, 0)} × ${fmt(opt.H, 0)} мм${isFinite(u.restMass) ? ' · ' + fmt(u.restMass, 1) + ' кг' : ''}`) : '')(usedPart(s, opt, x.g))}
       ${mass ? kv('Вес деталей на листе', fmt(mass, 2) + ' кг') : ''}
       ${kv('Покрытие деталей на листе', areaTxt(a1s, afs, afOk) + (afOk ? ' <em>(1 ст. ' + sqm(a1s) + ')</em>' : ''))}
@@ -737,16 +773,17 @@
     // 2. раскладка
     if (st.result) {
       const { groups, T: S, opt } = summary(); const c = st.result.cfg;
+      const perRows = groups.filter(x => x.opt.gap !== opt.gap || x.opt.W !== opt.W || x.opt.H !== opt.H).map(x => [groupLabel(x.g.mat, x.g.t), `лист ${x.opt.W} × ${x.opt.H}, между деталями ${x.opt.gap}`]);
       const r2 = [[{ v: 'Раскладка на листе', s: 'title' }], [{ v: st.dirty ? 'Внимание: после раскладки детали или настройки менялись — раскладка может быть устаревшей.' : 'Раскладка актуальна.', s: 'muted' }], [],
-        ['Лист, мм', `${opt.W} × ${opt.H}`], ['Между деталями, мм', +c.gap || 0], ['От края листа, мм', +c.margin || 0], ['Врезка (подвод), мм', +c.lead || 0],
+        ['Лист, мм', `${opt.W} × ${opt.H}`], ['Между деталями, мм', +c.gap || 0], ['От края листа, мм', +c.margin || 0], ['Врезка (подвод), мм', +c.lead || 0], ...perRows,
         ['Способ', c.mode === 'rect' ? 'по габариту' : 'свободная форма'], ['Поворот', { 0: 'без поворота', 180: '0° и 180°', 90: 'кратно 90°', 45: 'кратно 45°', 15: 'кратно 15°' }[c.rot] || ''],
         ['В отверстия', c.mode !== 'rect' && c.holes ? 'да' : 'нет'], ['Общий рез (впритык)', c.common ? 'да' : 'нет'], ['Зеркалить', c.mirror ? 'да' : 'нет'], [],
         [{ v: 'Длина реза всего, м', s: 'b' }, { v: S.total, s: 'acc' }], ['в т.ч. по контурам, м', { v: S.cut / 1000, s: 'n2' }], ['в т.ч. врезки, м', { v: S.pier * S.lead / 1000, s: 'n2' }], ['Общий рез сэкономил, м', { v: S.shared / 1000, s: 'n2' }],
         ['Листов', { v: S.sheets, s: 'int' }], ['Деталей', { v: S.parts, s: 'int' }], ['Врезок', { v: S.pier, s: 'int' }], ['Вес деталей, кг', { v: S.pm, s: 'n1' }], ['Металл по факту (без остатков листов), кг', S.metalUsed ? { v: S.metalUsed, s: 'n1' } : '—'], ['Вес листов (металл), кг', S.metalOk ? { v: S.metal, s: 'n1' } : (S.metal ? { v: S.metal, s: 'n1' } : '—')], ['Площадь покрытия полная, м²', S.afOk ? { v: S.af / 1e6, s: 'n3' } : '—'], ['Площадь покрытия, 1 сторона, м²', { v: S.a1 / 1e6, s: 'n3' }], [],
-        [H('Материал'), H('Толщина, мм'), H('Листов'), H('Деталей'), H('Рез, м'), H('Врезок'), H('Использование, %'), H('Вес деталей, кг'), H('Металл, кг'), H('Газ'), H('Покрытие полное, м²'), H('Покрытие 1 стор., м²')]];
-      for (const x of groups) r2.push([MATS[x.g.mat] ? MATS[x.g.mat].name : x.g.mat, x.g.t || '—', { v: x.sheets, s: 'int' }, { v: x.parts, s: 'int' }, { v: x.total, s: 'n2' }, { v: x.pier, s: 'int' }, { v: x.util * 100, s: 'n1' }, { v: x.partsMass, s: 'n1' }, isFinite(x.metal) ? { v: x.metal, s: 'n1' } : '—', [...new Set(x.g.list.map(p => GASES[p.gas] ? GASES[p.gas].short : p.gas))].join(', '), x.afOk ? { v: x.af / 1e6, s: 'n3' } : '—', { v: x.a1 / 1e6, s: 'n3' }]);
+        [H('Материал'), H('Толщина, мм'), H('Листов'), H('Деталей'), H('Рез, м'), H('Врезок'), H('Лист, мм'), H('Вес деталей, кг'), H('Металл, кг'), H('Газ'), H('Покрытие полное, м²'), H('Покрытие 1 стор., м²')]];
+      for (const x of groups) r2.push([MATS[x.g.mat] ? MATS[x.g.mat].name : x.g.mat, x.g.t || '—', { v: x.sheets, s: 'int' }, { v: x.parts, s: 'int' }, { v: x.total, s: 'n2' }, { v: x.pier, s: 'int' }, `${x.opt.W} × ${x.opt.H}`, { v: x.partsMass, s: 'n1' }, isFinite(x.metal) ? { v: x.metal, s: 'n1' } : '—', [...new Set(x.g.list.map(p => GASES[p.gas] ? GASES[p.gas].short : p.gas))].join(', '), x.afOk ? { v: x.af / 1e6, s: 'n3' } : '—', { v: x.a1 / 1e6, s: 'n3' }]);
       r2.push([]);
-      r2.push([H('Материал, толщина'), H('Лист №'), H('Таких листов'), H('Деталей на листе'), H('Рез на лист, м'), H('Врезок на лист'), H('Использование, %'), H('Используется листа, мм'), H('Вес использ. части, кг'), H('Состав листа')]);
+      r2.push([H('Материал, толщина'), H('Лист №'), H('Таких листов'), H('Деталей на листе'), H('Рез на лист, м'), H('Врезок на лист'), H('Лист, мм'), H('Используется листа, мм'), H('Вес использ. части, кг'), H('Состав листа')]);
       const imgRows = [[{ v: 'Картинки листов', s: 'title' }]]; const images = []; const heights = [];
       let ir = 2;
       for (const x of groups) {
@@ -756,11 +793,11 @@
           const cnt = new Map(); for (const it of s.items) cnt.set(it.id, (cnt.get(it.id) || 0) + 1);
           const comp = [...cnt].map(([id, n]) => (x.byPid.get(id) || {}).name + ' × ' + n).join('; ');
           const label = groupLabel(x.g.mat, x.g.t);
-          r2.push([label, s.count > 1 ? `${first}–${no}` : String(first), { v: s.count, s: 'int' }, { v: s.items.length, s: 'int' }, { v: (s.cut + s.pierces * S.lead) / 1000, s: 'n2' }, { v: s.pierces, s: 'int' }, { v: s.util * 100, s: 'n1' }, ...(u => u ? [`${fmt(u.len, 0)} × ${fmt(opt.H, 0)}`, isFinite(u.mass) ? { v: u.mass, s: 'n1' } : ''] : ['весь лист', ''])(usedPart(s, opt, x.g)), { v: comp, s: 'wrap' }]);
+          r2.push([label, s.count > 1 ? `${first}–${no}` : String(first), { v: s.count, s: 'int' }, { v: s.items.length, s: 'int' }, { v: (s.cut + s.pierces * S.lead) / 1000, s: 'n2' }, { v: s.pierces, s: 'int' }, `${x.opt.W} × ${x.opt.H}`, ...(u => u ? [`${fmt(u.len, 0)} × ${fmt(x.opt.H, 0)}`, isFinite(u.mass) ? { v: u.mass, s: 'n1' } : ''] : ['весь лист', ''])(usedPart(s, x.opt, x.g)), { v: comp, s: 'wrap' }]);
           // картинка
-          const im = sheetSvg(x, s, opt, 1100);
+          const im = sheetSvg(x, s, x.opt, 1100);
           const png = await XLSX.svgToPng(im.svg, im.w, im.h);
-          imgRows[ir] = [{ v: `${label} — лист ${s.count > 1 ? first + '–' + no + ' (×' + s.count + ')' : first}: деталей ${s.items.length}, рез ${fmt((s.cut + s.pierces * S.lead) / 1000, 2)} м, использование ${fmt(s.util * 100, 1)}%`, s: 'b' }];
+          imgRows[ir] = [{ v: `${label} — лист ${s.count > 1 ? first + '–' + no + ' (×' + s.count + ')' : first}: деталей ${s.items.length}, рез ${fmt((s.cut + s.pierces * S.lead) / 1000, 2)} м`, s: 'b' }];
           if (png) { const ih = Math.round(900 * im.h / im.w); images.push({ png, col: 0, row: ir + 1, w: 900, h: ih }); heights[ir + 1] = Math.ceil(ih * 0.75) + 6; ir += 3; }
           else ir += 2;
         }
