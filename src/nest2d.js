@@ -264,6 +264,17 @@
         if (!fitAny && !placed.length && t.left > 0 && !sheets.length) { /* проверим ниже, влезает ли вообще */ }
       }
 
+      // точная раскладка по габариту — если на этом листе она выходит лучше сетки, берём её (зазор в ней ровно заданный)
+      if (!shared) {
+        const exact = rectSheet(types, before, W, H, margin, gap, Date.now() + (opt.rectMs || 3000));
+        const areaOf = L => L.reduce((s2, pl) => s2 + pl.area, 0);
+        if (exact && exact.length && (areaOf(exact) > areaOf(placed) + 1e-6 || (rectMode && areaOf(exact) >= areaOf(placed) - 1e-6))) {
+          placed.length = 0; cnt.clear();
+          for (const pl of exact) { placed.push(pl); const t = types.find(x => x.p.id === pl.id); cnt.set(t, (cnt.get(t) || 0) + 1); }
+          for (const t of types) t.left = before.get(t) - (cnt.get(t) || 0);
+        }
+      }
+
       if (!placed.length) {
         // ничего не влезло на пустой лист — эти детали больше листа
         for (const t of types) if (t.left > 0) { unplaced.push({ id: t.p.id, n: t.left, reason: 'не помещается на лист' }); t.left = 0; }
@@ -287,6 +298,78 @@
       if (progress) progress(0.05 + 0.95 * doneQty / Math.max(1, totalQty), 'Листов: ' + sheets.reduce((s, x) => s + x.count, 0));
     }
     return { sheets, unplaced, cell: c };
+  }
+
+  // ---------------------------------------------------------------- точная раскладка по габариту (без сетки)
+  // MaxRects: свободные прямоугольники листа; детали — габариты с зазором ровно gap. Несколько правил выбора, берём лучший лист.
+  function rectSheet(types, left, W, H, margin, gap, deadline) {
+    const BW = W - 2 * margin + gap, BH = H - 2 * margin + gap;
+    if (!(BW > 0 && BH > 0)) return null;
+    const kinds = []; // варианты габарита каждой детали (0° и 90°)
+    for (const t of types) {
+      if (!(left.get(t) > 0)) continue;
+      const seen = new Set(), ors = [];
+      for (const or of t.outs) { if (or.mir || or.ang % 90 !== 0) continue; const k = or.o.w.toFixed(4) + 'x' + or.o.h.toFixed(4); if (seen.has(k)) continue; seen.add(k); ors.push(or); }
+      if (ors.length) kinds.push({ t, ors });
+    }
+    if (!kinds.length) return null;
+    const E = 1e-7;
+    const run = rule => {
+      let free = [{ x: 0, y: 0, w: BW, h: BH }];
+      const n = new Map(kinds.map(k => [k.t, left.get(k.t)])), out = [];
+      for (;;) {
+        if (Date.now() > deadline) return null;
+        let best = null;
+        for (const k of kinds) { if (!(n.get(k.t) > 0)) continue;
+          for (const or of k.ors) { const w = or.o.w + gap, h = or.o.h + gap;
+            for (const f of free) { if (w > f.w + E || h > f.h + E) continue;
+              const dw = f.w - w, dh = f.h - h;
+              const sc = rule === 'left' ? [f.x, f.y] : rule === 'bottom' ? [f.y, f.x] : rule === 'short' ? [Math.min(dw, dh), Math.max(dw, dh)] : rule === 'long' ? [Math.max(dw, dh), Math.min(dw, dh)] : [f.w * f.h - w * h, Math.min(dw, dh)];
+              if (!best || sc[0] < best.sc[0] - E || (Math.abs(sc[0] - best.sc[0]) <= E && (sc[1] < best.sc[1] - E || (Math.abs(sc[1] - best.sc[1]) <= E && (f.x < best.x - E || (Math.abs(f.x - best.x) <= E && f.y < best.y - E))))))
+                best = { sc, k, or, x: f.x, y: f.y, w, h };
+            } } }
+        if (!best) break;
+        out.push(best); n.set(best.k.t, n.get(best.k.t) - 1);
+        // разрезать свободные прямоугольники, которые задела деталь
+        const r = best, nf = [];
+        for (const f of free) {
+          if (r.x >= f.x + f.w - E || r.x + r.w <= f.x + E || r.y >= f.y + f.h - E || r.y + r.h <= f.y + E) { nf.push(f); continue; }
+          if (r.x > f.x + E) nf.push({ x: f.x, y: f.y, w: r.x - f.x, h: f.h });
+          if (r.x + r.w < f.x + f.w - E) nf.push({ x: r.x + r.w, y: f.y, w: f.x + f.w - r.x - r.w, h: f.h });
+          if (r.y > f.y + E) nf.push({ x: f.x, y: f.y, w: f.w, h: r.y - f.y });
+          if (r.y + r.h < f.y + f.h - E) nf.push({ x: f.x, y: r.y + r.h, w: f.w, h: f.y + f.h - r.y - r.h });
+        }
+        // убрать вложенные
+        free = nf.filter((a, i) => !nf.some((b, j) => j !== i && a.x >= b.x - E && a.y >= b.y - E && a.x + a.w <= b.x + b.w + E && a.y + a.h <= b.y + b.h + E && (j < i || a.w !== b.w || a.h !== b.h || a.x !== b.x || a.y !== b.y)));
+      }
+      return out;
+    };
+    let best = null;
+    for (const rule of ['left', 'bottom', 'short', 'long', 'area']) {
+      const out = run(rule); if (!out) break;
+      const area = out.reduce((s, r) => s + r.k.t.area, 0), usedX = out.reduce((m, r) => Math.max(m, r.x + r.w - gap), 0);
+      if (!best || area > best.area + 1e-6 || (Math.abs(area - best.area) <= 1e-6 && usedX < best.usedX - 1e-6)) best = { out, area, usedX };
+    }
+    // одна деталь: ещё и «полосами» — ряды в одной ориентации, остаток в другой (так раскладывают вручную)
+    if (kinds.length === 1) { const g = stripSheet(kinds[0], left.get(kinds[0].t), BW, BH, gap); if (g && (!best || g.area > best.area + 1e-6 || (Math.abs(g.area - best.area) <= 1e-6 && g.usedX < best.usedX - 1e-6))) best = g; }
+    if (!best || !best.out.length) return null;
+    return best.out.map(r => placement(r.k.t, r.or, margin + r.x, margin + r.y));
+  }
+  // одинаковые детали: лист делится на две зоны (по длине или по ширине), в каждой — сетка в своей ориентации; перебор границы
+  function stripSheet(k, qty, BW, BH, gap) {
+    const ors = k.ors.slice(0, 2), t = k.t;
+    const grid = (or, x0, y0, w, h) => { const a = or.o.w + gap, b = or.o.h + gap, nx = Math.floor(w / a + 1e-9), ny = Math.floor(h / b + 1e-9), out = [];
+      for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) out.push({ k, or, x: x0 + i * a, y: y0 + j * b, w: a, h: b }); return out; };
+    let best = null;
+    const take = out => { out = out.slice(0, qty); out.sort((p, q) => p.x - q.x || p.y - q.y); const area = out.length * t.area, usedX = out.reduce((m, r) => Math.max(m, r.x + r.w - gap), 0);
+      if (!best || area > best.area + 1e-6 || (Math.abs(area - best.area) <= 1e-6 && usedX < best.usedX - 1e-6)) best = { out, area, usedX }; };
+    for (const A of ors) for (const B of ors) {
+      // граница по X: слева A, справа B
+      for (let i = 0, a = A.o.w + gap; i * a <= BW + 1e-9; i++) take(grid(A, 0, 0, i * a, BH).concat(grid(B, i * a, 0, BW - i * a, BH)));
+      // граница по Y: снизу A, сверху B
+      for (let j = 0, b = A.o.h + gap; j * b <= BH + 1e-9; j++) take(grid(A, 0, 0, BW, j * b).concat(grid(B, 0, j * b, BW, BH - j * b)));
+    }
+    return best;
   }
 
   function fitsEmpty(t, W, H, margin) { return t.outs.some(or => or.o.w <= W - 2 * margin + 1e-6 && or.o.h <= H - 2 * margin + 1e-6); }

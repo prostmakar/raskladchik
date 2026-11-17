@@ -91,5 +91,15 @@ const XL = require('../src/xlsx.js');
 const xb = XL.build([{ name: 'Тест/1', rows: [['a', 1, { v: 2.5, s: 'n2' }]] }]);
 ok(xb[0] === 0x50 && xb[1] === 0x4B && xb.length > 1000, 'xlsx собран (' + xb.length + ' байт)');
 
+console.log('Раскладка 600 деталей 814×84 на 2500×1250 (зазор 5, край 5) — 15 листов по 40, как в CypCut');
+{ const fs = require('fs'), path = require('path');
+  const a = DC.analyze(fs.readFileSync(path.join(__dirname, 'models', 'pdgi-301241-060-list1.2-kor2.dxf'), 'latin1')), pc = a.pieces[0];
+  for (const mode of ['rect', 'shape']) {
+    const r = N.nest([{ id: 'k', qty: 600, polys: [pc.outer.poly, ...pc.holes.map(h => h.poly)], area: pc.outer.area || 1, cut: a.cut, pierces: a.pierces }], { W: 2500, H: 1250, margin: 5, gap: 5, mode, holes: false, rotStep: 90, mirror: true });
+    const n = r.sheets.reduce((s, x) => s + x.count, 0);
+    ok(n === 15 && r.sheets[0].items.length === 40, `${mode === 'rect' ? 'по габариту' : 'свободная форма'}: листов ${n}, на листе ${r.sheets[0].items.length}`);
+  }
+}
+
 console.log(fail ? `\nОшибок: ${fail}` : '\nВсе проверки пройдены');
 process.exit(fail ? 1 : 0);
