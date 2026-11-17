@@ -29,6 +29,7 @@ jobs:
           node tests/test_calc.js
           node tests/test_dxf.js
           node tests/test_models.js
+          node tests/test_files.js
       - name: Сборка
         if: steps.v.outputs.exists != '1'
         run: python3 build.py

@@ -56,6 +56,7 @@ tests/
   test_iges.js       расчёт IGES из командной строки
   test_dxf.js        проверки DXF и раскладки на листе (node tests/test_dxf.js)
   test_models.js     расчёт по 3D на проверочных моделях: профиль, рез, вес, зазор в раскладке (node tests/test_models.js)
+  test_files.js      расчёт по настоящим файлам из заказов (tests/models) — то, что уже ломалось
   gen_step.js        генератор проверочных STEP-моделей (труба, круглая, уголок, швеллер; косые торцы, отверстия)
 tools/
   make_icon.py       рисует иконку и собирает .syso
