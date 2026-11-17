@@ -443,6 +443,8 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
 @media (max-width:900px){ .st-cards{grid-template-columns:1fr} .st-cards .st-card[data-go=pdf]{width:100%} }
 
 @media (max-width:900px){ .ed{flex-direction:column} .ed-right{width:auto;max-width:none;flex:1.2} .ed-left{flex:1} }
+.buyt tr.bprof td{font-weight:600}.buyt tr.bpart td{color:var(--muted);font-size:.92em;border-top:0;padding-top:3px;padding-bottom:3px}.buyt tr.bpart td:first-child{padding-left:30px}.buyt th,.buyt td{padding-left:6px;padding-right:6px}.buyt th{letter-spacing:0}.buyt td:first-child,.buyt th:first-child{padding-left:16px}.buyt td:last-child,.buyt th:last-child{padding-right:16px}.buyt td:first-child{max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rulerb{margin-left:8px}.rulerb.on{background:var(--ink);color:var(--panel)}
 </style>
 </head>
 <body>
@@ -743,7 +745,7 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
     <div class="ed-left">
       <div class="vtool">
         <div class="seg" id="barTabs"><button data-v="plan" class="on">Схема</button><button data-v="3d">3D (тест)</button></div>
-        <div class="seg" id="bar3views" hidden><button data-v="iso">Изометрия</button><button data-v="front">Спереди</button><button data-v="top">Сверху</button></div>
+        <div class="seg" id="bar3views" hidden><button data-v="iso">Изометрия</button><button data-v="front">Спереди</button><button data-v="top">Сверху</button></div><button class="btn small rulerb" data-ruler id="barRuler" hidden title="Линейка: щёлкните две точки на модели">📏 Линейка</button>
         <span class="spacer"></span>
         <span class="lbl" id="barHint">наведите на деталь справа — она подсветится</span>
       </div>
@@ -762,7 +764,7 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
   <div class="ed">
     <div class="ed-left">
       <div class="vtool">
-        <div class="seg" id="v3views"><button data-v="iso">Изометрия</button><button data-v="front">Спереди</button><button data-v="top">Сверху</button><button data-v="end">С торца</button></div>
+        <div class="seg" id="v3views"><button data-v="iso">Изометрия</button><button data-v="front">Спереди</button><button data-v="top">Сверху</button><button data-v="end">С торца</button></div><button class="btn small rulerb" data-ruler title="Линейка: щёлкните две точки на модели">📏 Линейка</button>
         <span class="spacer"></span>
         <span class="lbl">мышь — вращать, правая кнопка или Shift — двигать, колесо — масштаб</span>
       </div>
@@ -916,6 +918,14 @@ function save(){
     try{ localStorage.setItem('xtcut.v2', JSON.stringify(Object.assign({}, d, {parts: st.parts.map(p=>p.res&&p.res.view?Object.assign({},p,{res:Object.assign({},p.res,{view:null})}):p)}))); }catch(e2){}
   }
 }
+
+// расчёт по 3D обновился — сохранённые детали пересчитываются по исходным файлам
+setTimeout(async()=>{ if(!Paths.api) return; let ch=false;
+  for(const p of st.parts){ if(p.src!=='xt' || !p.path || !p.res || p.res.ver===XTCut.VER) continue;
+    try{ const b=await Paths.read(p.path);
+      p.res = p.fmt==='IGES' ? XTCut.analyzeModel(IGES.toModel(b)) : p.fmt==='STEP' ? XTCut.analyzeModel(STEP.toModel(b)) : XTCut.analyze(new TextDecoder('windows-1251').decode(b));
+      if(p.fmt) srcBytes.set(p.id,b); ch=true; }catch(e){} }
+  if(ch){ save(); render(); renderNest(); } }, 400);
 
 function newManual(src, name, file){
   return {id:nextId++, src, name:name||'', file:file||'', qty:1, mode:st.defMode, status:'fill',
@@ -1423,7 +1433,7 @@ function openBar(gi, pi){
 }
 function barTab(v){
   document.querySelectorAll('#barTabs button').forEach(b=>b.classList.toggle('on', b.dataset.v===v));
-  $('#barPlan').hidden = v!=='plan'; $('#bar3box').hidden = v!=='3d'; $('#bar3views').hidden = v!=='3d';
+  $('#barPlan').hidden = v!=='plan'; $('#bar3box').hidden = v!=='3d'; $('#bar3views').hidden = v!=='3d'; $('#barRuler').hidden = v!=='3d'; $('#barRuler').classList.remove('on');
   $('#barHint').textContent = v==='3d' ? 'мышь — вращать, колесо — масштаб' : 'наведите на деталь справа — она подсветится';
   if(v==='3d' && barCur){ if(barV3){ barV3.destroy(); barV3=null; } setTimeout(()=>{ const m=bar3dModel(barCur); barV3 = new View3D.Viewer($('#bar3cv'), m.view, {colorOf: c=>m.colors[c]||'#888', iso: [-Math.acos(Math.max(0.06, Math.min(1, 30*m.sec/barCur.S))), 0.4]}); },20); }
 }
@@ -1467,6 +1477,8 @@ function bar3dModel({g, pt, S}){
 }
 $('#barTabs').addEventListener('click',e=>{ const b=e.target.closest('button'); if(b) barTab(b.dataset.v); });
 $('#bar3views').addEventListener('click',e=>{ const b=e.target.closest('button'); if(b&&barV3) barV3.home(b.dataset.v); });
+window.__view3d = () => ({bar: barV3, part: v3, cur: barCur}); // для проверок
+document.addEventListener('click',e=>{ const b=e.target.closest('[data-ruler]'); if(!b) return; const v = b.closest('#v3m') ? v3 : barV3; if(!v) return; v.setRuler(!v.ruler); b.classList.toggle('on', v.ruler); });
 function closeBar(){ $('#barm').hidden=true; if(barV3){ barV3.destroy(); barV3=null; } barCur=null; }
 $('#barClose').addEventListener('click', closeBar);
 $('#barm').addEventListener('click', e=>{ if(e.target.id==='barm') closeBar(); });
@@ -1493,6 +1505,7 @@ function openView3d(id){
   if(v3){ v3.destroy(); v3=null; }
   const has = r.view && r.view.edges && r.view.edges.length;
   $('#v3msg').hidden = !!has; $('#v3cv').hidden = !has;
+  document.querySelector('#v3m [data-ruler]').classList.remove('on');
   if(!has) $('#v3msg').textContent = 'Модель для просмотра не сохранилась между запусками — перетащите файл снова.';
   else setTimeout(()=>{ v3 = new View3D.Viewer($('#v3cv'), r.view, {colorOf}); },20);
   const s = C.summarize(r, p.mode); const q=Math.max(1,Math.round(num(p.qty))||1);
@@ -1533,6 +1546,8 @@ function shapeOf(p){
 }
 const rectOf = g => ({L:g.L,A:g.A,B:g.B,sym:'none',lo:[0,0,0,0],ro:[g.L,g.L,g.L,g.L],angL:90,angR:90});
 function profOf(p){ return p.src==='xt' ? (p.res&&p.res.prof) : p.prof; }
+// вес одной детали, кг: кг/м профиля × длина
+function partKg(p){ const pr=profOf(p), L=partLen(p); return pr && L>0 ? C.kgPerM(pr)*L/1000 : NaN; }
 // площадь под покрытие одной детали, мм²: наружная и полная (снаружи + внутри + торцы)
 function areaOf(p){
   const L=partLen(p);
@@ -1586,7 +1601,9 @@ function renderNest(){
     const R0 = join ? C.nestWithStock(pieces.map(x=>Object.assign({},x,{g:rectOf(x.g)})), S, K, nb.t0, nb.t1, stock) : R;
     const pr = profOf(parts[0]); const kgm = pr ? C.kgPerM(pr) : NaN;
     let aO=0, aF=0, aOk=true; for(const p of parts){ const a=areaOf(p), q=Math.max(1,Math.round(num(p.qty))||1); if(!a){ aOk=false; continue; } aO+=a.outer*q; if(isFinite(a.full)) aF+=a.full*q; else aOk=false; }
-    lastNest.push({pk,S,K,R,R0,kgm,stock,color,prof:profOf(parts[0]),aO,aF,aOk});
+    // рез и вес по каждой детали профиля — для закупки
+    const rowsP = parts.map(p=>{ const q=Math.max(1,Math.round(num(p.qty))||1), r=analysisOf(p), cut=r?C.summarize(r,p.mode).total:NaN, kg=partKg(p); return {name:p.name||'Деталь', q, cut, kg}; });
+    lastNest.push({pk,S,K,R,R0,kgm,stock,color,prof:profOf(parts[0]),aO,aF,aOk,rowsP});
     const waste = R.total? (1 - R.partsLen/R.total)*100 : 0;
     const bizN = R.patterns.reduce((s,pt)=>s+(pt.rest+nb.t1>=nb.biz&&pt.rest>0?pt.n:0),0);
     const stockChips = (nb.stock[pk]||[]).map((x,i)=>`<span class="schip">${fmt(num(x.L),0)} мм × ${Math.round(num(x.n))||0}<button class="ic" data-sdel="${esc(pk)}" data-si="${i}" title="Убрать">×</button></span>`).join('');
@@ -1606,13 +1623,16 @@ function renderNest(){
   if(skipped.length) html+=`<div class="note">Не вошли: ${skipped.map(esc).join(', ')}</div>`;
   $('#nestOut').innerHTML=html;
   // purchase summary
-  let tb=0, tm=0, tkg=0, anyKg=true, tsave=0;
-  let tst=0, tao=0, taf=0, tok=true;
-  const rows = lastNest.map(g=>{ tao+=g.aO; taf+=g.aF; tok=tok&&g.aOk; const m=g.R.bars*g.S/1000, kg=g.kgm*m; tb+=g.R.bars; tm+=m; tst+=g.R.stockBars; if(isFinite(kg)) tkg+=kg; else anyKg=false; tsave+=g.R0.bars-g.R.bars;
-    return `<tr><td>${esc(g.pk)}</td><td class="num">${fmt(g.S,0)}</td><td class="num big">${g.R.bars}</td><td class="num">${g.R.stockBars||'—'}</td><td class="num">${fmt(m,1)}</td><td class="num">${isFinite(kg)?fmt(kg,0):'—'}</td><td class="num">${fmt(g.R.partsLen/1000,2)}</td><td class="num">${fmt(g.R.total?(1-g.R.partsLen/g.R.total)*100:0,1)}%</td><td class="num">${m2(g.aO)}</td><td class="num">${g.aOk?m2(g.aF):'—'}</td>${join?`<td class="num">${g.R0.bars-g.R.bars>0?'−'+(g.R0.bars-g.R.bars):'—'}</td>`:''}</tr>`; }).join('');
+  let tb=0, tm=0, tkg=0, anyKg=true, tst=0, tq=0, tcut=0, tw=0, anyW=true;
+  const kgf = v => isFinite(v) ? fmt(v, v<100?2:1) : '—';
+  const rows = lastNest.map(g=>{ const m=g.R.bars*g.S/1000, kg=g.kgm*m; tb+=g.R.bars; tm+=m; tst+=g.R.stockBars; if(isFinite(kg)) tkg+=kg; else anyKg=false;
+    let q=0, cut=0, w=0, wOk=true; for(const r of g.rowsP){ q+=r.q; if(isFinite(r.cut)) cut+=r.cut*r.q; if(isFinite(r.kg)) w+=r.kg*r.q; else wOk=false; }
+    tq+=q; tcut+=cut; tw+=w; anyW=anyW&&wOk;
+    return `<tr class="bprof"><td>${esc(g.pk)}</td><td class="num">${fmt(g.S,0)}</td><td class="num big">${g.R.bars}</td><td class="num">${g.R.stockBars||'—'}</td><td class="num">${fmt(m,1)}</td><td class="num">${isFinite(kg)?fmt(kg,0):'—'}</td><td class="num">${fmt(g.R.partsLen/1000,2)}</td><td class="num">${q}</td><td></td><td class="num">${fmt(cut/1000,2)}</td><td></td><td class="num">${wOk?kgf(w):'—'}</td></tr>`
+      + g.rowsP.map(r=>`<tr class="bpart"><td title="${esc(r.name)}">${esc(r.name)}</td><td></td><td></td><td></td><td></td><td></td><td></td><td class="num">${r.q}</td><td class="num">${isFinite(r.cut)?fmt(r.cut/1000,3):'—'}</td><td class="num">${isFinite(r.cut)?fmt(r.cut*r.q/1000,2):'—'}</td><td class="num">${kgf(r.kg)}</td><td class="num">${kgf(r.kg*r.q)}</td></tr>`).join(''); }).join('');
   $('#buyOut').innerHTML = `<div class="ncard"><div class="nhead"><h3>Закупка</h3></div>
-    <div style="overflow:auto"><table style="min-width:820px"><thead><tr><th>Профиль</th><th class="num">Хлыст, мм</th><th class="num">Купить хлыстов</th><th class="num">Из отходов</th><th class="num">Метров</th><th class="num">≈ кг</th><th class="num">Детали, м</th><th class="num">Отход</th><th class="num">Покрытие наружн.</th><th class="num">Покрытие полн.</th>${join?'<th class="num">Стыковка</th>':''}</tr></thead>
-    <tbody>${rows}</tbody><tfoot><tr><td>Итого</td><td></td><td class="num">${tb}</td><td class="num">${tst||'—'}</td><td class="num">${fmt(tm,1)}</td><td class="num">${anyKg?fmt(tkg,0):fmt(tkg,0)+'+'}</td><td></td><td></td><td class="num">${m2(tao)}</td><td class="num">${tok?m2(taf):'—'}</td>${join?`<td class="num">${tsave?'−'+tsave:'—'}</td>`:''}</tr></tfoot></table></div></div>`;
+    <div style="overflow:auto"><table class="buyt" style="min-width:820px"><thead><tr><th>Профиль / деталь</th><th class="num">Хлыст, мм</th><th class="num">Купить хлыстов</th><th class="num">Из отходов</th><th class="num">Метров</th><th class="num">≈ кг</th><th class="num">Детали, м</th><th class="num">Шт</th><th class="num">Рез 1 шт, м</th><th class="num">Рез всего, м</th><th class="num">Вес 1 шт, кг</th><th class="num">Вес всех, кг</th></tr></thead>
+    <tbody>${rows}</tbody><tfoot><tr><td>Итого</td><td></td><td class="num">${tb}</td><td class="num">${tst||'—'}</td><td class="num">${fmt(tm,1)}</td><td class="num">${anyKg?fmt(tkg,0):fmt(tkg,0)+'+'}</td><td></td><td class="num">${tq}</td><td></td><td class="num">${fmt(tcut/1000,2)}</td><td></td><td class="num">${kgf(tw)}${anyW?'':'+'}</td></tr></tfoot></table></div></div>`;
 }
 $('#nestOut').addEventListener('click',e=>{
   const pr=e.target.closest('[data-pat]'); if(pr && !e.target.closest('input,button')){ const [gi,pi]=pr.dataset.pat.split(':').map(Number); openBar(gi,pi); return; }
@@ -1629,11 +1649,11 @@ $('#btnNestCsv').addEventListener('click',saveTubeXlsx);
 function nestSheets(){
   const nb=st.nest;
   const r1=[[{v:'Закупка труб',s:'title'}],[{v:'Сохранено: '+new Date().toLocaleString('ru-RU'),s:'muted'}],[],
-    [XH('Профиль'),XH('Хлыст, мм'),XH('Купить хлыстов'),XH('Метров'),XH('Масса ≈ кг'),XH('Из отходов, шт'),XH('Отходы, м'),XH('Длина деталей, м'),XH('Отход, %'),XH('Не поместились, шт'),XH('Покрытие наружн., м²'),XH('Покрытие полное, м²')]];
-  let TB=0,TM=0,TK=0,TS=0,TAO=0,TAF=0;
-  for(const g of lastNest){ const m=g.R.bars*g.S/1000, kg=g.kgm*m; TB+=g.R.bars; TM+=m; if(isFinite(kg)) TK+=kg; TS+=g.R.stockBars; TAO+=g.aO/1e6; TAF+=g.aF/1e6;
-    r1.push([g.pk,{v:g.S,s:'int'},{v:g.R.bars,s:'bint'},{v:m,s:'n1'},isFinite(kg)?{v:kg,s:'n1'}:'',g.R.stockBars||'',g.R.stockLen?{v:g.R.stockLen/1000,s:'n2'}:'',{v:g.R.partsLen/1000,s:'n2'},{v:g.R.total?(1-g.R.partsLen/g.R.total)*100:0,s:'n1'},g.R.too.length||'',{v:g.aO/1e6,s:'n3'},g.aOk?{v:g.aF/1e6,s:'n3'}:'—']); }
-  r1.push([{v:'Итого',s:'b'},'',{v:TB,s:'bint'},{v:TM,s:'bn1'},{v:TK,s:'bn1'},TS||'','','','','',{v:TAO,s:'bn3'},{v:TAF,s:'bn3'}]);
+    [XH('Профиль'),XH('Хлыст, мм'),XH('Купить хлыстов'),XH('Метров'),XH('Масса ≈ кг'),XH('Из отходов, шт'),XH('Отходы, м'),XH('Длина деталей, м'),XH('Не поместились, шт'),XH('Деталей, шт'),XH('Рез всего, м'),XH('Вес деталей, кг')]];
+  let TB=0,TM=0,TK=0,TS=0,TQ=0,TC=0,TW=0;
+  for(const g of lastNest){ const m=g.R.bars*g.S/1000, kg=g.kgm*m; TB+=g.R.bars; TM+=m; if(isFinite(kg)) TK+=kg; TS+=g.R.stockBars; let q=0,cut=0,w=0; for(const r of g.rowsP){ q+=r.q; if(isFinite(r.cut)) cut+=r.cut*r.q/1000; if(isFinite(r.kg)) w+=r.kg*r.q; } TQ+=q; TC+=cut; TW+=w;
+    r1.push([g.pk,{v:g.S,s:'int'},{v:g.R.bars,s:'bint'},{v:m,s:'n1'},isFinite(kg)?{v:kg,s:'n1'}:'',g.R.stockBars||'',g.R.stockLen?{v:g.R.stockLen/1000,s:'n2'}:'',{v:g.R.partsLen/1000,s:'n2'},g.R.too.length||'',{v:q,s:'int'},{v:cut,s:'n2'},{v:w,s:'n2'}]); }
+  r1.push([{v:'Итого',s:'b'},'',{v:TB,s:'bint'},{v:TM,s:'bn1'},{v:TK,s:'bn1'},TS||'','','','',{v:TQ,s:'bint'},{v:TC,s:'bn2'},{v:TW,s:'bn2'}]);
   r1.push([],[{v:'Параметры',s:'b'}],['Расстояние между деталями (основное), мм',+nb.kerf],...lastNest.filter(g=>g.K!==nb.kerf).map(g=>['  '+g.pk+' — между деталями, мм',+g.K]),['Обрезка начала хлыста, мм',+nb.t0],['Нерабочий остаток (зажим), мм',+nb.t1],['Деловой остаток от, мм',+nb.biz],['Стыковка скосов',nb.join!==false?'да':'нет']);
   const stockRows=[]; for(const g of lastNest) for(const x of g.stock) stockRows.push([g.pk,{v:num(x.L),s:'int'},{v:Math.round(num(x.n)),s:'int'}]);
   if(stockRows.length){ r1.push([],[{v:'Деловые отходы / трубы заказчика',s:'b'}],[XH('Профиль'),XH('Длина, мм'),XH('Шт')],...stockRows);
@@ -1643,7 +1663,7 @@ function nestSheets(){
       r2.push([g.pk,pt.stock?'отход / труба заказчика':'хлыст',{v:pt.S||g.S,s:'int'},{v:pt.n,s:'bint'},{v:pt.items.map(it=>`${it.p.name} ${n2(it.p.g.L)}${it.o.flip?' (развернуть)':''}${it.shared?' [общий рез]':''}`).join(' + '),s:'wrap'},pt.items.length,{v:rest,s:'n1'},rest>=nb.biz&&pt.rest>0?'да':'']); }
     if(g.R.too.length) r2.push([g.pk,{v:'Не помещаются: '+[...new Set(g.R.too.map(t=>t.name+' '+fmt(t.g.L,0)+' мм'))].join(', '),s:'muted'}]);
     r2.push([]); }
-  return [{name:'Закупка',cols:[30,12,14,10,12,14,11,16,10,16,14,14],rows:r1,heights:{3:32}},{name:'Раскрой',cols:[26,22,14,12,80,10,12,10],rows:r2,landscape:true,freeze:3}];
+  return [{name:'Закупка',cols:[30,12,14,10,12,14,11,16,16,12,14,14],rows:r1,heights:{3:32}},{name:'Раскрой',cols:[26,22,14,12,80,10,12,10],rows:r2,landscape:true,freeze:3}];
 }
 
 // ---------- раскрой труб в 3D: один файл на хлыст ----------

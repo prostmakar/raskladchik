@@ -24,6 +24,9 @@
     channel: { name: 'Швеллер', dims: ['H', 'B', 't'] },
   };
 
+  // швеллеры горячекатаные ГОСТ 8240 (У и П): высота, полка, стенка, кг/м — полки толще стенки, по одной толщине вес не посчитать
+  const CHANNELS = [[50, 32, 4.4, 4.84], [65, 36, 4.4, 5.9], [80, 40, 4.5, 7.05], [100, 46, 4.5, 8.59], [120, 52, 4.8, 10.4], [140, 58, 4.9, 12.3], [160, 64, 5, 14.2], [180, 70, 5.1, 16.3], [200, 76, 5.2, 18.4], [220, 82, 5.4, 21], [240, 90, 5.6, 24], [270, 95, 6, 27.7], [300, 100, 6.5, 31.8], [400, 115, 8, 48.3]];
+  const gostChannel = (a, b, t) => CHANNELS.find(c => Math.abs(c[0] - a) < 0.6 && Math.abs(c[1] - b) < 0.6 && Math.abs(c[2] - t) < 0.16);
   function autoR(p) { const t = num(p.t) || 0; return Math.min(2 * t, Math.min(num(p.a), num(p.b)) / 2 - 0.01); }
 
   function profileLabel(p) {
@@ -121,7 +124,7 @@
     const strs = items.map(s => String(s).trim()).filter(Boolean);
     const text = strs.join(' ');
     const out = { prof: null, L: null, holes: [], angles: [], name: '' };
-    const des = /(?:[А-ЯЁA-Z]{2,6}\s?[.\s]?\s?)?\d{3,5}(?:\.\d{2,3}){1,3}(?:-\d{2,3}(?:\.\d{2,3}){1,3})?(?:-\d{2})?/.exec(text);
+    const des = /(?:[А-ЯЁA-Z]{2,6}\s?[.\s]?\s?)?\d{3,5}(?:\.\d{2,3}){1,5}(?:-\d{2,3}(?:\.\d{2,3}){1,5})?(?:-\d{2})?/.exec(text);
     if (des) out.name = des[0].replace(/\s+/g, '');
     const nm = '(\\d+(?:[.,]\\d+)?)', x = '\\s*[хxХX×*]\\s*';
     const re = new RegExp('(Труба|Профиль|Уголок|Швеллер)?[^0-9]{0,30}?([ØФ⌀]\\s*)?' + nm + x + nm + '(?:' + x + nm + ')?\\s*(?:мм\\s*)?(?:ГОСТ|ТУ|СТБ)\\s*(?:Р\\s*)?(\\d+)', 'i');
@@ -132,6 +135,13 @@
       if (m[2] || (!m[5] && type !== 'angle')) type = 'round';
       if (type === 'round') out.prof = { type, a: num(m[3]), b: '', t: num(m[5] || m[4]) };
       else out.prof = { type, a: num(m[3]), b: num(m[4]), t: num(m[5]) };
+    }
+    if (!out.prof) { // без ГОСТа в надписи: «Труба 50х50х4, Сталь 09Г2С», «Швеллер 18»
+      const m2 = new RegExp('(Труба|Профиль|Уголок|Швеллер)\\s*([ØФ⌀]\\s*)?' + nm + x + nm + '(?:' + x + nm + ')?', 'i').exec(text);
+      const ch = /Швеллер\s*№?\s*(\d{1,2}(?:[.,]5)?)\s*[УПуп]?(?![\d.,]*\s*[хxХX×*])/i.exec(text);
+      if (m2) { const kw = m2[1].toLowerCase(); let type = kw.startsWith('уголок') ? 'angle' : kw.startsWith('швеллер') ? 'channel' : m2[5] ? 'rect' : 'round'; if (m2[2]) type = 'round';
+        if (type === 'round') out.prof = { type, a: num(m2[3]), b: '', t: num(m2[5] || m2[4]) }; else if (m2[5]) out.prof = { type, a: num(m2[3]), b: num(m2[4]), t: num(m2[5]) }; }
+      if (!out.prof && ch) { const c = CHANNELS.find(c => c[0] === Math.round(num(ch[1]) * 10)); if (c) out.prof = { type: 'channel', a: c[0], b: c[1], t: c[2] }; }
     }
     const pure = strs.map(s => /^(\d{2,5}(?:[.,]\d+)?)\s*\*?(?:\s*[-+±]\s*\d+(?:[.,]\d+)?)?$/.exec(s)).filter(Boolean).map(r => num(r[1])).filter(v => v >= 20 && v <= 13000);
     if (pure.length) out.L = Math.max(...pure);
@@ -378,6 +388,8 @@
   // section area, mm² (for mass estimate, steel 7850 kg/m³)
   function sectionArea(p) {
     const a = num(p.a), b = num(p.b), t = num(p.t);
+    if (num(p.area) > 0) return num(p.area); // из 3D-модели
+    if (p.type === 'channel') { const c = gostChannel(a, b, t); if (c) return c[3] / 7850 * 1e6; }
     if (!(a > 0) || !(t > 0)) return NaN;
     if (p.type === 'round') return Math.PI / 4 * (a * a - Math.pow(Math.max(0, a - 2 * t), 2));
     if (!(b > 0)) return NaN;

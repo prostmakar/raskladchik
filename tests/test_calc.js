@@ -37,6 +37,24 @@ const g = raskos(1039.4, "63°30'");
 const four = C.nestShapes([0, 1, 2, 3].map(() => ({ key: 'a', name: 'a', g })), 6000, 0, 0, 0);
 near('4×04.05.104 валетом, длина', four.patterns[0].end, 4 * 1039.4 - 120.3 - 34.6 - 120.3, 0.2);
 
+// 6а. Зазор между деталями: в самом тесном месте — ровно заданный (общий рез выключен зазором больше 5 мм)
+{
+  const mk = (L, a1, a2, shape) => C.manualShape({ prof: { type: 'rect', a: 120, b: 120, t: 5, r: '' }, L, shape, ends: [{ ang: a1, side: 'a' }, { ang: a2, side: 'a' }] });
+  const shapes = [mk(1038, '45', '45', 'para'), mk(583.5, '60', '45'), mk(700, '90', '30'), mk(400, '90', '90')];
+  for (const K of [10, 6]) {
+    const pcs = []; shapes.forEach((g, i) => { for (let k = 0; k < 5; k++) pcs.push({ key: 'p' + i, name: 'p' + i, g }); });
+    const N = C.nestShapes(pcs, 6000, K, 10, 300); let worst = 0, cnt = 0;
+    for (const pt of N.patterns) for (let i = 1; i < pt.items.length; i++) { const a = pt.items[i - 1], b = pt.items[i]; if (b.shared) continue;
+      const gmin = Math.min(...a.o.ro.map((r, k) => b.s + b.o.lo[k] - a.s - r)); worst = Math.max(worst, Math.abs(gmin - K)); cnt++; }
+    near(`зазор ${K} мм между ${cnt} парами деталей, отклонение`, worst, 0, 1e-6);
+  }
+}
+
+// 6б. Швеллер по номеру и вес: 18П — 16,3 кг/м (ГОСТ 8240), гнутый — по толщине
+near('швеллер 18П, кг/м', C.kgPerM({ type: 'channel', a: 180, b: 70, t: 5.1 }), 16.3, 0.01);
+near('швеллер гнутый 100×50×4, кг/м', C.kgPerM({ type: 'channel', a: 100, b: 50, t: 4 }), 4 * (100 + 100 - 8) * 7850 / 1e6, 0.01);
+near('«Швеллер 14» с чертежа, высота', C.parseDrawing(['Швеллер 14, Сталь 09Г2С', '1100']).prof.a, 140, 0);
+
 // 7. Масса 1 м
 near('60×40×3, кг/м', C.kgPerM({ type: 'rect', a: 60, b: 40, t: 3 }), 4.25, 0.02);
 

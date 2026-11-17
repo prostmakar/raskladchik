@@ -203,12 +203,23 @@
 
   // ---------- 2D helpers ----------
   function hull2(P) {
-    const p = P.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    // точки округляются до 1e-6 и повторы убираются: шум в 15-м знаке (NURBS из IGES) иначе выбивает из оболочки настоящий угол
+    const seen = new Set(), p = [];
+    for (const q of P) { const x = Math.round(q[0] * 1e6) / 1e6, y = Math.round(q[1] * 1e6) / 1e6, k = x + ':' + y; if (!seen.has(k)) { seen.add(k); p.push([x, y]); } }
+    p.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    if (p.length < 3) return p;
     const cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
     const lo = [], up = [];
     for (const q of p) { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], q) <= 1e-9) lo.pop(); lo.push(q); }
     for (let i = p.length - 1; i >= 0; i--) { const q = p[i]; while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], q) <= 1e-9) up.pop(); up.push(q); }
     up.pop(); lo.pop(); return lo.concat(up);
+  }
+  // центр тяжести многоугольника (не среднее вершин: на скруглениях вершин много, и среднее уезжает к ним)
+  function centroid2(H) {
+    let a = 0, x = 0, y = 0;
+    for (let i = 0; i < H.length; i++) { const p = H[i], q = H[(i + 1) % H.length], c = p[0] * q[1] - q[0] * p[1]; a += c; x += (p[0] + q[0]) * c; y += (p[1] + q[1]) * c; }
+    if (Math.abs(a) < 1e-12) return [H.reduce((s, p) => s + p[0], 0) / H.length, H.reduce((s, p) => s + p[1], 0) / H.length];
+    return [x / (3 * a), y / (3 * a)];
   }
   function distToPoly(q, H) {
     let best = Infinity;
@@ -267,6 +278,7 @@
   }
 
   // ---------- main analysis ----------
+  const VER = 2; // номер расчёта: сохранённые детали со старым номером пересчитываются по исходному файлу
   function analyze(text) { return analyzeModel(fromXT(text)); }
   function analyzeModel(model) {
     const E = model.edges, F = model.faces;
@@ -358,20 +370,24 @@
         for (let i = 1; i < M.length; i++) { const d = M[i][0] - M[i - 1][1]; if (d > best) { best = d; g = [M[i - 1][1], M[i][0]]; } }
         if (best > 0.12 * PER && best > 2 * (isFinite(t) ? t : 1)) openGap = { s0: g[0], s1: g[1], len: best }; }
     }
-    let kind = 'closed';
+    let kind = 'closed', chanWeb = null;
     if (openGap && isFinite(t)) {
       // торцы полок (кромки шириной ~t у края разрыва) — не режутся отдельно и не входят в путь реза
-      const w = 1.6 * t, cyc = x => ((x % PER) + PER) % PER;
+      const w = 2.6 * t, cyc = x => ((x % PER) + PER) % PER;
       const inRange = (iv, a, b) => { const x0 = cyc(iv[0]), L = iv[1] - iv[0]; const A = cyc(a); const off = cyc(x0 - A); return off + L <= cyc(b - a) + 1e-6; };
       for (const f of outerF) if (f.iv && (inRange(f.iv, openGap.s0 - w, openGap.s0) || inRange(f.iv, openGap.s1, openGap.s1 + w))) f.tip = true;
       const legs = outerF.filter(f => !f.tip && f.surf.kind === 'plane');
       // нормаль полки — наружу от центра сечения (в IGES/STEP направление нормали у плоскости бывает любым)
-      const hc = [H.reduce((s2, p) => s2 + p[0], 0) / H.length, H.reduce((s2, p) => s2 + p[1], 0) / H.length];
+      const hc = centroid2(H);
       const outN = f => { let n = norm(f.surf.n); const P2 = f.pts.map(to2); if (!P2.length) return n;
         const fc = [P2.reduce((s2, p) => s2 + p[0], 0) / P2.length, P2.reduce((s2, p) => s2 + p[1], 0) / P2.length];
         if ((fc[0] - hc[0]) * dot(n, U) + (fc[1] - hc[1]) * dot(n, V) < 0) n = mul(n, -1); return n; };
       const ns = []; for (const f of legs) { const n = outN(f); if (!ns.some(m => Math.abs(dot(m, n)) > 0.999 && dot(m, n) > 0)) ns.push(n); }
       kind = ns.length >= 3 ? 'channel' : 'angle';
+      // стенка швеллера — та сторона, у которой нет противоположной (полки смотрят в разные стороны)
+      // (у С-образного профиля напротив стенки есть отгибы — берём сторону, которая шире своей противоположной)
+      if (kind === 'channel') { const wOf = n => legs.reduce((a, f) => { const d = dot(outN(f), n), wd = f.iv ? f.iv[1] - f.iv[0] : 0; return a + (d > 0.999 ? wd : d < -0.999 ? -wd : 0); }, 0);
+        chanWeb = ns.slice().sort((x, y) => wOf(y) - wOf(x))[0]; }
     }
     const pathLen = PER - (openGap ? openGap.len : 0) - outerF.filter(f => f.tip && f.iv).reduce((s2, f) => s2 + (f.iv[1] - f.iv[0]), 0);
 
@@ -391,7 +407,7 @@
 
     const hs = allPts.map(p => dot(p, axis));
     const zmin = Math.min(...hs), zmax = Math.max(...hs);
-    const cx = H.reduce((s, p) => s + p[0], 0) / H.length, cy = H.reduce((s, p) => s + p[1], 0) / H.length;
+    const [cx, cy] = centroid2(H);
     const contours = [], endPts = [];
     let gid = -1;
     for (const es of groups.values()) {
@@ -428,9 +444,8 @@
     const round = kind === 'closed' && ![...F.values()].some(f => f.outer && f.surf.kind === 'plane');
     const thick = isFinite(t) ? r1(t) : null;
     let pa_ = r1(Math.max(w, h)), pb_ = r1(Math.min(w, h));
-    if (kind === 'channel') { // высота стенки (вдоль стенки) и ширина полки (поперёк)
-      const mid = [cx, cy]; const gm = (() => { const sv = ((openGap.s0 + openGap.s1) / 2) % PER; for (const g of segs) if (sv >= g.s0 && sv <= g.s0 + g.L) { const tt = g.L ? (sv - g.s0) / g.L : 0; return [g.a[0] + (g.b[0] - g.a[0]) * tt, g.a[1] + (g.b[1] - g.a[1]) * tt]; } return mid; })();
-      const gd = [gm[0] - mid[0], gm[1] - mid[1]]; const gl = Math.hypot(gd[0], gd[1]) || 1; const g2 = [gd[0] / gl, gd[1] / gl];
+    if (kind === 'channel' && chanWeb) { // высота — поперёк полок (вдоль стенки), полка — по нормали к стенке
+      const g2 = [dot(chanWeb, U), dot(chanWeb, V)];
       const along = H.map(p => p[0] * g2[0] + p[1] * g2[1]), across = H.map(p => -p[0] * g2[1] + p[1] * g2[0]);
       pb_ = r1(Math.max(...along) - Math.min(...along)); pa_ = r1(Math.max(...across) - Math.min(...across));
     }
@@ -453,17 +468,28 @@
       const bil = (v, q) => { const u = A ? ((q[0] * dA[0] + q[1] * dA[1]) - aMin) / A : 0, w = B ? ((q[0] * dB[0] + q[1] * dB[1]) - bMin) / B : 0; return v[0] * (1 - u) * (1 - w) + v[1] * (1 - u) * w + v[2] * u * (1 - w) + v[3] * u * w; };
       const over = (e, v, left) => { let m = 0; for (const p of e.pts) { const d = left ? bil(v, to2(p)) - (dot(p, axis) - zmin) : (dot(p, axis) - zmin) - bil(v, to2(p)); if (d > m) m = d; } return m; };
       const L = zmax - zmin;
-      const lo = sorted.length >= 1 && sorted[0].z - zmin < L / 2 ? atCorners(sorted[0]) : [0, 0, 0, 0];
+      // плоский торец (прямой или косой рез): положение на углах габарита — точно по плоскости реза, тогда зазор в раскладке выходит ровно заданным
+      const planeAt = e => {
+        const S = [[0, 0, 0], [0, 0, 0], [0, 0, 0]], T = [0, 0, 0];
+        const ab = p => { const q = to2(p); return [1, (q[0] * dA[0] + q[1] * dA[1]) - aMin - A / 2, (q[0] * dB[0] + q[1] * dB[1]) - bMin - B / 2]; };
+        for (const p of e.pts) { const r = ab(p), z = dot(p, axis) - zmin; for (let i = 0; i < 3; i++) { T[i] += r[i] * z; for (let j = 0; j < 3; j++) S[i][j] += r[i] * r[j]; } }
+        const det = m => m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+        const D = det(S); if (!(Math.abs(D) > 1e-9)) return null;
+        const c = [0, 1, 2].map(i => det(S.map((row, r) => row.map((v, j) => j === i ? T[r] : v))) / D);
+        for (const p of e.pts) { const r = ab(p); if (Math.abs(c[0] + c[1] * r[1] + c[2] * r[2] - (dot(p, axis) - zmin)) > 0.02) return null; }
+        return [0, 1, 2, 3].map(k => c[0] + c[1] * ((k >> 1) ? A / 2 : -A / 2) + c[2] * ((k & 1) ? B / 2 : -B / 2));
+      };
+      const leftEnd = sorted.length >= 1 && sorted[0].z - zmin < L / 2 ? sorted[0] : null;
       const right = sorted.length && sorted[sorted.length - 1].z - zmin >= L / 2 ? sorted[sorted.length - 1] : null;
-      const ro = right ? atCorners(right) : [L, L, L, L];
-      if (sorted.length >= 1 && sorted[0].z - zmin < L / 2) { const d = over(sorted[0], lo, true); for (let k = 0; k < 4; k++) lo[k] -= d; }
-      if (right) { const d = over(right, ro, false); for (let k = 0; k < 4; k++) ro[k] += d; }
+      const endAt = (e, left) => { const pl = planeAt(e); if (pl) return pl; const v = atCorners(e), d = over(e, v, left); return v.map(x => left ? x - d : x + d); };
+      const lo = leftEnd ? endAt(leftEnd, true) : [0, 0, 0, 0];
+      const ro = right ? endAt(right, false) : [L, L, L, L];
       const mn = Math.min(...lo); for (let k = 0; k < 4; k++) { lo[k] -= mn; ro[k] -= mn; }
       const angOf = (v, sgn) => { const sa = Math.abs(v[2] - v[0]), sb = Math.abs(v[1] - v[0]); const sp = Math.max(sa, sb); if (sp < 0.05) return 90; return Math.atan2(sa >= sb ? A : B, sp) * 180 / Math.PI; };
       // система координат детали для выкладки на хлыст: x — вдоль оси от нуля формы, a/b — по сторонам габарита сечения
       const e1 = add(mul(U, dA[0]), mul(V, dA[1])), e2 = add(mul(U, dB[0]), mul(V, dB[1]));
       fr = { ax: axis, e1, e2, x0: zmin + mn, a0: aMin, b0: bMin, box: [0, A, 0, B], kind: 'box' };
-      shape = { L, A: r1(A), B: r1(B), sym: kind === 'angle' ? (Math.abs(A - B) < 0.05 ? 'angleEq' : 'angle') : kind === 'channel' ? 'channel' : round || Math.abs(A - B) < 0.05 ? 'square' : 'rect', lo: lo.map(v => Math.round(v * 100) / 100), ro: ro.map(v => Math.round(v * 100) / 100), angL: angOf(lo), angR: angOf(ro) };
+      shape = { L: Math.max(L, ...ro), A: r1(A), B: r1(B), sym: kind === 'angle' ? (Math.abs(A - B) < 0.05 ? 'angleEq' : 'angle') : kind === 'channel' ? 'channel' : round || Math.abs(A - B) < 0.05 ? 'square' : 'rect', lo: lo.map(v => Math.round(v * 100) / 100), ro: ro.map(v => Math.round(v * 100) / 100), angL: angOf(lo), angR: angOf(ro) };
       // открытый профиль: форма торцов — по точкам вдоль наружных полок (от кромки одной полки до кромки другой)
       if (kind !== 'closed' && openGap) {
         const NS = 17, pathS0 = openGap.s1, pathS1 = openGap.s0 + (openGap.s0 < openGap.s1 ? PER : 0);
@@ -517,7 +543,14 @@
       if (!(areaFull > 1.5 * areaOuter)) areaFull = 2 * areaOuter;
       areaApprox = true;
     }
-    return { length: zmax - zmin, profile: profile + (thick ? '×' + String(thick).replace('.', ',') : ''), prof, shape, contours, warnings: [...warnings], nEdges: E.length, nFaces: F.size, view: { edges: view, axis }, fr, endAng, areaOuter, areaFull, areaApprox };
+    // площадь сечения, мм² — по плоскому торцу, который закрывает всё сечение (для точного веса: у горячекатаного швеллера полки толще стенки)
+    { const hullA = Math.abs(shoelace(H)); let sa = 0;
+      for (const fc of F.values()) { const sf = fc.surf; if (!sf || sf.kind !== 'plane' || !(fc.area > 0) || fc.pts.length < 3) continue;
+        const c = Math.abs(dot(norm(sf.n), axis)); if (c < 0.15) continue;
+        if (Math.abs(shoelace(hull2(fc.pts.map(to2)))) < 0.98 * hullA) continue;
+        sa = Math.max(sa, fc.area * c); }
+      if (sa > 0 && sa <= hullA * 1.001) prof.area = Math.round(sa * 100) / 100; }
+    return { length: zmax - zmin, profile: profile + (thick ? '×' + String(thick).replace('.', ',') : ''), prof, shape, contours, warnings: [...warnings], ver: VER, nEdges: E.length, nFaces: F.size, view: { edges: view, axis }, fr, endAng, areaOuter, areaFull, areaApprox };
   }
 
   // summary for a torcovka mode: 'both' | 'one' | 'none'
@@ -533,6 +566,6 @@
     return { total: endsLen + otherLen, endsLen, nEndsKept: keepN, nEndsFound: ends.length, endLens: ends.map(c => c.len), otherLen, pierces: keepN + others.length, groups: [...groups.values()] };
   }
 
-  root.XTCut = { buildModel, edgeGeom, analyze, analyzeModel, fromXT, summarize, scan, resolve, bodyText, vec: { sub, add, mul, dot, cross, len, norm } };
+  root.XTCut = { VER, buildModel, edgeGeom, analyze, analyzeModel, fromXT, summarize, scan, resolve, bodyText, vec: { sub, add, mul, dot, cross, len, norm } };
   if (typeof module !== 'undefined') module.exports = root.XTCut;
 })(typeof window !== 'undefined' ? window : globalThis);
