@@ -27,6 +27,7 @@ jobs:
         if: steps.v.outputs.exists != '1'
         run: |
           node tests/test_calc.js
+          node tests/test_price.js
           node tests/test_dxf.js
           node tests/test_models.js
           node tests/test_files.js

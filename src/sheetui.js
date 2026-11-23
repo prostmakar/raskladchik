@@ -810,6 +810,49 @@
     toast('Файл Excel — в папке «Загрузки».');
   }
 
+  // ---------------------------------------------------------------- стоимость
+  let costRows = [], costExtras = [];
+  const money = n => fmt(n, 2) + ' руб.';
+  function updateCost() {
+    const r = SheetPrice.calculate(costRows, costExtras);
+    r.items.forEach((x, i) => { $('#costRow' + i).textContent = money(x.total); $('#costMetalRow' + i).textContent = money(x.metal); $('#costCutRow' + i).textContent = 'Рез: ' + money(x.cut); });
+    $('#costMetal').textContent = money(r.metal); $('#costCut').textContent = money(r.cut); $('#costExtra').textContent = money(r.extra); $('#costTotal').textContent = money(r.total);
+  }
+  function drawCost() {
+    const unfinished = st.result.groups.some(g => g.r.unplaced.length);
+    $('#costBody').innerHTML = `<p class="note costnote">Металл считается по весу использованных листов, без остатков. Длина реза включает подводы.</p>${unfinished ? '<div class="banner">Есть неразложенные детали — они не входят в расчёт.</div>' : ''}` + costRows.map((r, i) => `<div class="costgroup"><h3>${esc(r.label)}</h3><div class="costgrid">
+      <div class="fld"><span>Металл: ${fmt(r.mass, 1)} кг</span><input type="text" inputmode="decimal" data-cost="${i}:metalRate" value="${String(r.metalRate).replace('.', ',')}"><span>руб./кг</span></div>
+      <div class="fld"><span>Рез: ${fmt(r.length, 2)} м</span><input type="text" inputmode="decimal" data-cost="${i}:cutRate" value="${String(r.cutRate).replace('.', ',')}"><span>руб./пог. м</span></div>
+      <div class="fld"><span>Металл</span><div class="cv" id="costMetalRow${i}">${money(r.mass * r.metalRate)}</div><span id="costCutRow${i}">Рез: ${money(r.length * r.cutRate)}</span></div>
+      <div class="fld"><span>Сумма</span><div class="cv acc" id="costRow${i}">${money(r.mass * r.metalRate + r.length * r.cutRate)}</div></div>
+    </div></div>`).join('') + `<div class="extras"><div class="bar"><h3>Доп. работы</h3><span class="spacer"></span><button class="btn small" id="costAdd">+ Добавить строку</button></div><div id="costExtras">${costExtras.map((x, i) => `<div class="extrarow"><input type="text" data-extra-name="${i}" value="${esc(x.name)}" placeholder="Название работы"><input type="text" inputmode="decimal" class="nm" data-extra-amount="${i}" value="${x.amount === '' ? '' : esc(x.amount)}" placeholder="Сумма, руб."><button class="ic del" data-extra-del="${i}" title="Удалить">✕</button></div>`).join('')}</div></div>
+      <div style="margin-top:14px"><div class="costsum"><span>Металл</span><b id="costMetal"></b></div><div class="costsum"><span>Рез</span><b id="costCut"></b></div><div class="costsum"><span>Доп. работы</span><b id="costExtra"></b></div></div>`;
+    $('#costAdd').onclick = () => { costExtras.push({ name: '', amount: '' }); drawCost(); };
+    updateCost();
+  }
+  function openCost() {
+    if (!st.result || st.dirty) { toast(st.result ? 'Сначала обновите раскладку — нажмите «Разложить»' : 'Сначала выполните раскладку на листе'); showTab('nest'); return; }
+    const S = summary();
+    if (!S.groups.length || S.groups.some(x => !(x.g.t > 0) || !isFinite(x.metalUsed))) { toast('Для расчёта укажите материал и толщину всех деталей'); return; }
+    const prices = SheetPrice.load();
+    costRows = S.groups.map(x => ({ label: groupLabel(x.g.mat, x.g.t), mass: x.metalUsed, length: x.total, metalRate: SheetPrice.metalRate(prices, x.g.mat, x.g.t), cutRate: SheetPrice.cutRate(prices, x.g.mat, x.g.t) }));
+    costExtras = [{ name: '', amount: '' }]; drawCost(); $('#costm').hidden = false;
+  }
+  $('#sCost').onclick = openCost;
+  $('#costClose').onclick = () => { $('#costm').hidden = true; };
+  $('#costm').addEventListener('click', e => { if (e.target.id === 'costm') $('#costm').hidden = true; });
+  $('#costBody').addEventListener('input', e => {
+    if (e.target.dataset.cost) { const [i, k] = e.target.dataset.cost.split(':'); costRows[i][k] = e.target.value; updateCost(); }
+    if (e.target.dataset.extraName !== undefined) costExtras[+e.target.dataset.extraName].name = e.target.value;
+    if (e.target.dataset.extraAmount !== undefined) { costExtras[+e.target.dataset.extraAmount].amount = e.target.value; updateCost(); }
+  });
+  $('#costBody').addEventListener('change', e => {
+    if (!e.target.dataset.cost && e.target.dataset.extraAmount === undefined) return;
+    if (e.target.value.trim() !== '' && (!(num(e.target.value) >= 0) || !isFinite(num(e.target.value)))) { toast('Введите число не меньше 0'); drawCost(); }
+  });
+  $('#costBody').addEventListener('click', e => { const b = e.target.closest('[data-extra-del]'); if (b) { costExtras.splice(+b.dataset.extraDel, 1); drawCost(); } });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#costm').hidden) $('#costm').hidden = true; });
+
   // ---------------------------------------------------------------- запуск
   function init(startFiles) {
     bulkInputs(); render(); tolInputs(); cfgInputs();
@@ -830,5 +873,5 @@
       if (n) { save(); render(); }
     })();
   }
-  window.__sheet = { st, save, init, addFiles, addBytes, addDrawn, replacePart, editPart, render, showTab, runNest, saveFixed, openView, openSheet, exportExcel, fixAll, metrics };
+  window.__sheet = { st, save, init, addFiles, addBytes, addDrawn, replacePart, editPart, render, showTab, runNest, saveFixed, openView, openSheet, exportExcel, fixAll, metrics, summary, openCost };
 })();

@@ -236,6 +236,15 @@ input::placeholder{color:var(--muted);opacity:.8}
 .ibtn:hover{border-color:var(--accent);color:var(--accent)}
 .ibtn.gear{font:400 18px/1 system-ui,sans-serif;font-style:normal}
 .setf{display:flex;flex-direction:column;gap:6px;font-size:14px;color:var(--muted)}.setf input{font:inherit;font-size:16px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink)}
+.priceset{margin-top:20px;padding-top:16px;border-top:1px solid var(--line)}
+.priceset h3{margin:0 0 4px;font-size:16px}.pricebar{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;margin:12px 0}.pricebar select{min-width:140px}.pricebar .fld input{width:92px}
+.pricegrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px 14px}.pricegrid label{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}.pricegrid label span{width:48px}.pricegrid input{width:82px;padding:5px 7px}
+.costbtn{margin-right:auto}.costnote{margin:0 0 12px}.costgroup{padding:12px 0;border-bottom:1px solid var(--line)}.costgroup h3{margin:0 0 10px;font-size:16px}
+.costgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.costgrid .fld input{width:100%}.costgrid .cv{font:600 14px var(--mono);padding-top:7px;text-align:right;color:var(--ink)}
+.costsum{display:flex;justify-content:space-between;gap:12px;margin-top:8px;font-size:14px}.costsum span{color:var(--muted)}.costsum b{font-family:var(--mono)}
+.extras{margin-top:16px}.extras .bar{margin:0 0 8px}.extras h3{margin:0;font-size:16px}.extrarow{display:grid;grid-template-columns:1fr 120px 28px;gap:8px;margin:7px 0;align-items:center}.extrarow input{width:100%}.extrarow input.nm{text-align:right}
+.costtotal{font-size:22px;font-family:var(--mono);color:var(--accent)}
+@media(max-width:600px){.pricegrid{grid-template-columns:1fr 1fr}.costgrid{grid-template-columns:1fr 1fr}}
 #themeSeg button.on{background:var(--ink);color:var(--panel)}
 .nver{border-bottom:1px solid var(--line);padding:12px 2px}.nver:last-child{border-bottom:0}
 .nver .nh{display:flex;align-items:center;gap:10px;margin-bottom:6px}.nver .nh b{font-size:16px}
@@ -539,7 +548,7 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
 <div class="wrap" id="appSheet" hidden>
   <header>
     <h1><button class="home" data-go="home" title="К выбору: трубы или лист">←</button>Лист: <span>проверка</span> и раскладка <span class="projtag"></span></h1>
-    <div class="modesw"><button data-go="tube">Трубы</button><button data-go="sheet" class="on">Лист</button><button data-go="pdf">PDF</button></div>
+    <button class="btn primary costbtn" id="sCost">Рассчитать</button>
     <div class="tabs" id="sTabs">
       <button data-t="parts" class="on">Детали<span class="cnt" id="sCnt"></span></button>
       <button data-t="nest">Раскладка на листе</button>
@@ -698,12 +707,23 @@ tr.needr td{background:color-mix(in srgb, var(--warnbg) 45%, transparent)}
 </div></div>
 <div class="modal center" id="setm" hidden><div class="dlg">
   <div class="dlg-h"><h2>Настройки</h2><button class="ic" id="setClose">✕</button></div>
-  <div class="dlg-b"><label class="setf">Имя<input type="text" id="setName" placeholder="Андрей" autocomplete="off"></label></div>
+  <div class="dlg-b">
+    <label class="setf">Имя<input type="text" id="setName" placeholder="Андрей" autocomplete="off"></label>
+    <div class="priceset"><h3>Цены для листа по умолчанию</h3><div class="hint2">Ваши личные тарифы, бел. руб. без НДС. Их можно изменить и в самом расчёте.</div>
+      <div class="pricebar"><div class="fld"><span>Материал</span><select id="setPriceMat"></select></div><div class="fld"><span>Металл до 3 мм, руб./кг</span><input type="text" inputmode="decimal" class="nm" id="setMetalLow"></div><div class="fld"><span>Свыше 3 мм, руб./кг</span><input type="text" inputmode="decimal" class="nm" id="setMetalHigh"></div></div>
+      <div class="fld" style="margin-bottom:7px"><span>Рез, руб./пог. м</span></div><div class="pricegrid" id="setPrices"></div>
+      <div class="bar"><button class="btn small" id="setPriceReset">Вернуть исходные цены для материала</button><span class="meta" id="setPriceMsg"></span></div>
+    </div>
+  </div>
+</div></div>
+<div class="modal center" id="costm" hidden><div class="dlg" style="width:760px">
+  <div class="dlg-h"><h2>Расчёт стоимости</h2><span class="meta">бел. руб. без НДС</span><button class="ic" id="costClose">✕</button></div>
+  <div class="dlg-b" id="costBody"></div>
+  <div class="dlg-f"><span class="meta">Металл + рез + доп. работы</span><span class="spacer"></span><b class="costtotal" id="costTotal">0,00 руб.</b></div>
 </div></div>
 <div class="modal center" id="soonm" hidden><div class="dlg">
   <div class="dlg-h"><h2>Скоро. Наверное.</h2><button class="ic" id="soonClose">✕</button></div>
   <div class="dlg-b soon">
-    <p><b>Стоимость реза.</b> Программа посчитает, сколько стоит резать. Ты смотришь на цифры, тихо закрываешь окно и уходишь домой.</p>
     <p><b>Коммерческое предложение.</b> КП в один клик.</p>
     <p><b>x_t в раскрое.</b> Детали из x_t тоже поедут в .igs и .zzx.</p>
     <p class="meta">Всё это приедет в версии 1.5.</p>
@@ -1825,6 +1845,9 @@ window.__pdf = { lib: pdfLib, open: openPdf };
 })();
 </script>
 <script>
+/*PRICE*/
+</script>
+<script>
 /*SHEETUI*/
 </script>
 <script>
@@ -2114,9 +2137,29 @@ window.__pdf = { lib: pdfLib, open: openPdf };
         ${rel&&top!==CUR&&API?`<button class="btn small${vcmp(top,CUR)>0?' primary':''}" data-inst="${esc2(top)}">${vcmp(top,CUR)>0?'Обновить до v'+esc2(top):'Установить v'+esc2(top)}</button>`:''}</div>${body}</div>`; }).join('');
   }
   $('#soonBtn').onclick = () => { $('#soonm').hidden = false; };
-  // ----- настройки: пока только имя — им подписываются проекты -----
+  // ----- настройки: имя и личные тарифы листового реза -----
   const closeSet = () => { $('#setm').hidden = true; window.__by(); };
-  $('#setBtn').onclick = () => { $('#setName').value = window.userName(); $('#setm').hidden = false; $('#setName').focus(); };
+  const priceMats = {st3:'Ст3', aisi:'AISI', '09g2s':'09Г2С', st20:'Ст20', zn:'Цинк'};
+  let priceCfg = SheetPrice.load();
+  const priceNum = v => { const s = v.trim().replace(',', '.'); const n = +s; return s !== '' && isFinite(n) && n >= 0 ? n : null; };
+  function drawPriceSettings(){
+    const m = $('#setPriceMat').value || 'st3', p = priceCfg[m];
+    $('#setPriceMat').value = m; $('#setMetalLow').value = String(p.metalLow).replace('.', ','); $('#setMetalHigh').value = String(p.metalHigh).replace('.', ',');
+    $('#setPrices').innerHTML = SheetPrice.THICK.map(t => `<label><span>${String(t).replace('.', ',')} мм</span><input type="text" inputmode="decimal" data-price-cut="${t}" value="${String(p.cut[t]).replace('.', ',')}"></label>`).join('');
+  }
+  function savePriceSettings(){ $('#setPriceMsg').textContent = SheetPrice.save(priceCfg) ? 'Сохранено' : 'Не удалось сохранить'; }
+  $('#setPriceMat').innerHTML = SheetPrice.MATS.map(m => `<option value="${m}">${priceMats[m]}</option>`).join('');
+  $('#setPriceMat').onchange = () => { $('#setPriceMsg').textContent = ''; drawPriceSettings(); };
+  for(const id of ['#setMetalLow', '#setMetalHigh']) $(id).addEventListener('change', e => {
+    const n = priceNum(e.target.value); if(n === null){ $('#setPriceMsg').textContent = 'Введите число не меньше 0'; drawPriceSettings(); return; }
+    priceCfg[$('#setPriceMat').value][id === '#setMetalLow' ? 'metalLow' : 'metalHigh'] = n; savePriceSettings(); drawPriceSettings();
+  });
+  $('#setPrices').addEventListener('change', e => {
+    const n = priceNum(e.target.value); if(!e.target.dataset.priceCut || n === null){ $('#setPriceMsg').textContent = 'Введите число не меньше 0'; drawPriceSettings(); return; }
+    priceCfg[$('#setPriceMat').value].cut[e.target.dataset.priceCut] = n; savePriceSettings(); drawPriceSettings();
+  });
+  $('#setPriceReset').onclick = () => { const m = $('#setPriceMat').value; priceCfg[m] = SheetPrice.defaults()[m]; savePriceSettings(); drawPriceSettings(); };
+  $('#setBtn').onclick = () => { priceCfg = SheetPrice.load(); $('#setName').value = window.userName(); $('#setPriceMsg').textContent = ''; drawPriceSettings(); $('#setm').hidden = false; $('#setName').focus(); };
   $('#setName').addEventListener('change', e => {
     try{ localStorage.setItem('app.user', e.target.value.trim()); }catch(err){}
     const m = J('proj.cur'); if(m && !m.author && window.userName()){ m.author = window.userName(); localStorage.setItem('proj.cur', JSON.stringify(m)); if(window.__proj) window.__proj.save(true); }

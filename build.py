@@ -54,6 +54,7 @@ def build_page():
         '/*DXF*/': read(os.path.join(SRC, 'dxf.js')),
         '/*DXFCLEAN*/': read(os.path.join(SRC, 'dxfclean.js')),
         '/*NEST2D*/': read(os.path.join(SRC, 'nest2d.js')),
+        '/*PRICE*/': read(os.path.join(SRC, 'price.js')),
         '/*SHEETUI*/': read(os.path.join(SRC, 'sheetui.js')),
         '/*DXFEDIT*/': read(os.path.join(SRC, 'dxfedit.js')),
         '/*TUBECUT*/': read(os.path.join(SRC, 'tubecut.js')),
