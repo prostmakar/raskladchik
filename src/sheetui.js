@@ -14,7 +14,7 @@
 
   // материалы, толщины, газы
   const MATS = { st3: { name: 'Ст3', rho: 7850, gas: 'o2' }, aisi: { name: 'AISI', rho: 7900, gas: 'n2' }, '09g2s': { name: '09Г2С', rho: 7850, gas: 'o2' }, st20: { name: 'Ст20', rho: 7850, gas: 'o2' }, zn: { name: 'Цинк (оцинковка)', short: 'Цинк', rho: 7850, gas: 'n2' } };
-  const THICK = [0.5, 0.8, 1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10, 12, 14, 16, 20, 25, 35, 36, 40];
+  const THICK = [0.5, 0.8, 1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10, 12, 14, 16, 20, 25, 30, 32, 35, 36, 40];
   const GASES = { air: { name: 'Воздух (компрессор)', short: 'воздух' }, o2: { name: 'Кислород', short: 'кислород' }, n2: { name: 'Азот', short: 'азот' } };
   const matName = m => MATS[m] ? (MATS[m].short || MATS[m].name) : '—';
   const tName = t => num(t) > 0 ? fmt(num(t), num(t) % 1 ? 1 : 0) + ' мм' : '';

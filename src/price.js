@@ -3,8 +3,8 @@
   'use strict';
   const KEY = 'sheet.prices.v1';
   const MATS = ['st3', 'aisi', '09g2s', 'st20', 'zn'];
-  const THICK = [0.5, 0.8, 1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10, 12, 14, 16, 20, 25, 35, 36, 40];
-  const ST3 = { 1: 1, 2: 1.15, 3: 1.4, 4: 1.75, 5: 1.8, 6: 2, 8: 2.55, 10: 4.35, 12: 5.15, 14: 6.15, 16: 7.05, 20: 8.5, 25: 15.6, 35: 35.1, 36: 35.1, 40: 60 };
+  const THICK = [0.5, 0.8, 1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10, 12, 14, 16, 20, 25, 30, 32, 35, 36, 40];
+  const ST3 = { 1: 1, 2: 1.15, 3: 1.4, 4: 1.75, 5: 1.8, 6: 2, 8: 2.55, 10: 4.35, 12: 5.15, 14: 6.15, 16: 7.05, 20: 8.5, 25: 15.6, 30: 25.35, 32: 29.25, 35: 35.1, 36: 35.1, 40: 60 };
   const num = v => { const n = +String(v === undefined || v === null ? '' : v).trim().replace(',', '.'); return isFinite(n) && n >= 0 ? n : 0; };
   const nonNeg = (v, d) => { if (v === undefined || v === null || String(v).trim() === '') return d; const n = +String(v).trim().replace(',', '.'); return isFinite(n) && n >= 0 ? n : d; };
   function defaults() {

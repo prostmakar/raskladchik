@@ -2,7 +2,7 @@
 const P = require('../src/price.js');
 const assert = require('node:assert/strict');
 
-const expected = { 1: 1, 2: 1.15, 3: 1.4, 4: 1.75, 5: 1.8, 6: 2, 8: 2.55, 10: 4.35, 12: 5.15, 14: 6.15, 16: 7.05, 20: 8.5, 25: 15.6, 35: 35.1, 36: 35.1, 40: 60 };
+const expected = { 1: 1, 2: 1.15, 3: 1.4, 4: 1.75, 5: 1.8, 6: 2, 8: 2.55, 10: 4.35, 12: 5.15, 14: 6.15, 16: 7.05, 20: 8.5, 25: 15.6, 30: 25.35, 32: 29.25, 35: 35.1, 36: 35.1, 40: 60 };
 const prices = P.defaults();
 for (const [t, price] of Object.entries(expected)) assert.equal(P.cutRate(prices, 'st3', t), price, `Ст3, ${t} мм`);
 for (const m of P.MATS) {
