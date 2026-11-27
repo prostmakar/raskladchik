@@ -19,18 +19,33 @@ assert.equal(custom.st3.metalHigh, 2.7);
 assert.equal(custom.st3.cut[2], 1.2);
 assert.equal(custom.aisi.cut[2], 2.4);
 assert.equal(custom.aisi.cut[3], 1.4);
-assert.equal(custom.st3.cut[2], 1.2);
 assert.equal(prices.st3.cut[2], 1.15, 'нормализация не меняет исходные тарифы');
 
+// доп. работы хранятся в каждой строке-группе
 const result = P.calculate([
-  { mass: 100, length: 10, metalRate: 3, cutRate: 1.15 },
-  { mass: 200, length: 20, metalRate: 2.5, cutRate: 1.75 }
-], [{ name: 'Доставка', amount: '25,50' }, { name: '', amount: '' }]);
+  { mass: 100, length: 10, metalRate: 3, cutRate: 1.15, extras: [{ name: 'Гибка', amount: '25,50' }, { name: '', amount: '' }] },
+  { mass: 200, length: 20, metalRate: 2.5, cutRate: 1.75, extras: [{ name: 'Сварка', amount: 10 }] }
+]);
 assert.equal(result.items[0].metal, 300);
 assert.equal(result.items[0].cut, 11.5);
+assert.equal(result.items[0].extra, 25.5);
+assert.equal(result.items[0].total, 337);
 assert.equal(result.items[1].metal, 500);
 assert.equal(result.items[1].cut, 35);
-assert.equal(result.extra, 25.5);
-assert.equal(result.total, 872);
+assert.equal(result.items[1].extra, 10);
+assert.equal(result.metal, 800);
+assert.equal(result.cut, 46.5);
+assert.equal(result.extra, 35.5);
+assert.equal(result.total, 882);
+
+// распределение суммы по весам: пропорционально, не поровну
+const sh = P.share([100, 200, 300], 150);
+assert.deepEqual(sh, [25, 50, 75]);
+assert.equal(sh.reduce((s, x) => s + x, 0), 150, 'доли в сумме дают исходную сумму');
+const eq = P.share([0, 0, 0], 90);
+assert.deepEqual(eq, [30, 30, 30], 'нулевые веса — делим поровну');
+assert.deepEqual(P.share([], 90), []);
+const zero = P.share([5, 5], 0);
+assert.deepEqual(zero, [0, 0]);
 
 console.log('Все проверки стоимости пройдены');

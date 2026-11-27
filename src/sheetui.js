@@ -805,53 +805,124 @@
       sheets.push({ name: 'Раскладка', cols: [24, 12, 12, 14, 14, 12, 16, 22, 16, 60, 16, 16], rows: r2 });
       sheets.push({ name: 'Листы', cols: [140], rows: imgRows, images, heights, landscape: true });
     }
+    // 3. стоимость (если раскладка актуальна и у всех деталей есть толщина)
+    if (st.result && !st.dirty && costOk()) {
+      buildCost();
+      const calc = SheetPrice.calculate(costState.rows);
+      const dp = costParts();
+      const n2v = v => isFinite(num(v)) ? { v: num(v), s: 'n2' } : { v: 0, s: 'n2' };
+      const r3 = [[{ v: 'Стоимость — бел. руб. без НДС', s: 'title' }], [{ v: 'Металл по весу использованных листов без остатков; рез включает подводы.', s: 'muted' }], [],
+        [H('Группа'), H('Металл, кг'), H('руб./кг'), H('Металл, руб.'), H('Рез, м'), H('руб./м'), H('Рез, руб.'), H('Доп. работы, руб.'), H('Итого, руб.')]];
+      calc.items.forEach((row, i) => {
+        r3.push([costState.rows[i].label, { v: costState.rows[i].mass, s: 'n1' }, n2v(row.metalRate), { v: row.metal, s: 'n2' }, { v: costState.rows[i].length, s: 'n2' }, n2v(row.cutRate), { v: row.cut, s: 'n2' }, { v: row.extra, s: 'n2' }, { v: row.total, s: 'acc' }]);
+        for (const w of row.works) if (w.name.trim() || w.amount) r3.push([(w.name.trim() || 'Доп. работа') + ' — ' + costState.rows[i].label, '', '', '', '', '', '', { v: w.amount, s: 'n2' }, '']);
+      });
+      r3.push([], ['Металл всего, руб.', { v: calc.metal, s: 'n2' }], ['Рез всего, руб.', { v: calc.cut, s: 'n2' }], ['Доп. работы всего, руб.', { v: calc.extra, s: 'n2' }], [{ v: 'Итого, руб.', s: 'b' }, { v: calc.total, s: 'acc' }], [],
+        [{ v: 'Стоимость деталей — ориентировочно: металл и рез по самой детали, доп. работы пропорционально доле детали в группе', s: 'muted' }], [],
+        [H('Деталь'), H('Группа'), H('Кол-во'), H('Металл, руб.'), H('Рез, руб.'), H('Доп. работы, руб.'), H('Цена 1 шт, руб.'), H('Сумма, руб.')]);
+      for (const g of dp.groups) for (const p of g.parts) r3.push([p.name, g.label, { v: p.qty, s: 'int' }, { v: p.metal, s: 'n2' }, { v: p.cut, s: 'n2' }, { v: p.extra, s: 'n2' }, { v: p.unit, s: 'n2' }, { v: p.total, s: 'n2' }]);
+      r3.push([{ v: 'Итого по деталям, руб.', s: 'b' }, '', '', '', '', '', '', { v: dp.total, s: 'acc' }]);
+      sheets.push({ name: 'Стоимость', cols: [38, 10, 9, 12, 9, 8, 12, 15, 12], rows: r3 });
+    }
     const bytes = XLSX.build(sheets);
     XLSX.download(bytes, `${window.fileBase()} — Лист ${st.result ? 'раскладка' : 'детали'}.xlsx`);
     toast('Файл Excel — в папке «Загрузки».');
   }
 
   // ---------------------------------------------------------------- стоимость
-  let costRows = [], costExtras = [];
+  let costState = null; // { result, rows: [{ gi, label, mass, length, metalRate, cutRate, extras: [{name, amount}] }] }
   const money = n => fmt(n, 2) + ' руб.';
+  function buildCost() {
+    if (costState && costState.result === st.result) return costState;
+    const S = summary();
+    const prices = SheetPrice.load();
+    costState = { result: st.result, rows: S.groups.map((x, gi) => ({ gi, label: groupLabel(x.g.mat, x.g.t), mass: x.metalUsed, length: x.total, metalRate: SheetPrice.metalRate(prices, x.g.mat, x.g.t), cutRate: SheetPrice.cutRate(prices, x.g.mat, x.g.t), extras: [{ name: '', amount: '' }] })) };
+    return costState;
+  }
+  function costOk() {
+    const S = summary();
+    return S.groups.length && !S.groups.some(x => !(x.g.t > 0) || !isFinite(x.metalUsed));
+  }
   function updateCost() {
-    const r = SheetPrice.calculate(costRows, costExtras);
-    r.items.forEach((x, i) => { $('#costRow' + i).textContent = money(x.total); $('#costMetalRow' + i).textContent = money(x.metal); $('#costCutRow' + i).textContent = 'Рез: ' + money(x.cut); });
+    const r = SheetPrice.calculate(costState.rows);
+    r.items.forEach((x, i) => { $('#costMetalRow' + i).textContent = money(x.metal); $('#costCutRow' + i).textContent = money(x.cut); $('#costRow' + i).textContent = money(x.total); });
     $('#costMetal').textContent = money(r.metal); $('#costCut').textContent = money(r.cut); $('#costExtra').textContent = money(r.extra); $('#costTotal').textContent = money(r.total);
   }
   function drawCost() {
     const unfinished = st.result.groups.some(g => g.r.unplaced.length);
-    $('#costBody').innerHTML = `<p class="note costnote">Металл считается по весу использованных листов, без остатков. Длина реза включает подводы.</p>${unfinished ? '<div class="banner">Есть неразложенные детали — они не входят в расчёт.</div>' : ''}` + costRows.map((r, i) => `<div class="costgroup"><h3>${esc(r.label)}</h3><div class="costgrid">
-      <div class="fld"><span>Металл: ${fmt(r.mass, 1)} кг</span><input type="text" inputmode="decimal" data-cost="${i}:metalRate" value="${String(r.metalRate).replace('.', ',')}"><span>руб./кг</span></div>
-      <div class="fld"><span>Рез: ${fmt(r.length, 2)} м</span><input type="text" inputmode="decimal" data-cost="${i}:cutRate" value="${String(r.cutRate).replace('.', ',')}"><span>руб./пог. м</span></div>
-      <div class="fld"><span>Металл</span><div class="cv" id="costMetalRow${i}">${money(r.mass * r.metalRate)}</div><span id="costCutRow${i}">Рез: ${money(r.length * r.cutRate)}</span></div>
-      <div class="fld"><span>Сумма</span><div class="cv acc" id="costRow${i}">${money(r.mass * r.metalRate + r.length * r.cutRate)}</div></div>
-    </div></div>`).join('') + `<div class="extras"><div class="bar"><h3>Доп. работы</h3><span class="spacer"></span><button class="btn small" id="costAdd">+ Добавить строку</button></div><div id="costExtras">${costExtras.map((x, i) => `<div class="extrarow"><input type="text" data-extra-name="${i}" value="${esc(x.name)}" placeholder="Название работы"><input type="text" inputmode="decimal" class="nm" data-extra-amount="${i}" value="${x.amount === '' ? '' : esc(x.amount)}" placeholder="Сумма, руб."><button class="ic del" data-extra-del="${i}" title="Удалить">✕</button></div>`).join('')}</div></div>
-      <div style="margin-top:14px"><div class="costsum"><span>Металл</span><b id="costMetal"></b></div><div class="costsum"><span>Рез</span><b id="costCut"></b></div><div class="costsum"><span>Доп. работы</span><b id="costExtra"></b></div></div>`;
-    $('#costAdd').onclick = () => { costExtras.push({ name: '', amount: '' }); drawCost(); };
+    $('#costBody').innerHTML = `<p class="note costnote">Металл считается по весу использованных листов без остатков. Длина реза включает подводы.</p>${unfinished ? '<div class="banner">Есть неразложенные детали — они не входят в расчёт.</div>' : ''}` + costState.rows.map((r, i) => `<div class="costgroup"><h3>${esc(r.label)}</h3>
+      <div class="crow"><span class="cn">Металл — ${fmt(r.mass, 1)} кг</span><input type="text" inputmode="decimal" data-cost="${i}:metalRate" value="${String(r.metalRate).replace('.', ',')}"><span class="cu">руб./кг</span><b class="cv" id="costMetalRow${i}"></b></div>
+      <div class="crow"><span class="cn">Рез — ${fmt(r.length, 2)} м</span><input type="text" inputmode="decimal" data-cost="${i}:cutRate" value="${String(r.cutRate).replace('.', ',')}"><span class="cu">руб./м</span><b class="cv" id="costCutRow${i}"></b></div>
+      ${r.extras.map((x, k) => `<div class="crow extrarow"><input type="text" data-extra-name="${i}:${k}" value="${esc(x.name)}" placeholder="Доп. работа"><input type="text" inputmode="decimal" data-extra-amount="${i}:${k}" value="${x.amount === '' ? '' : esc(String(x.amount))}" placeholder="руб."><span class="cu"></span><button class="ic del" data-extra-del="${i}:${k}" title="Убрать">✕</button></div>`).join('')}
+      <button class="exadd" data-extra-add="${i}">+ Доп. работа</button>
+      <div class="costsum"><span>Сумма — металл + рез + доп. работы</span><b class="acc" id="costRow${i}"></b></div>
+    </div>`).join('') + `<div class="costend"><div class="costsum"><span>Металл всего</span><b id="costMetal"></b></div><div class="costsum"><span>Рез всего</span><b id="costCut"></b></div><div class="costsum"><span>Доп. работы всего</span><b id="costExtra"></b></div></div>`;
     updateCost();
   }
   function openCost() {
     if (!st.result || st.dirty) { toast(st.result ? 'Сначала обновите раскладку — нажмите «Разложить»' : 'Сначала выполните раскладку на листе'); showTab('nest'); return; }
+    if (!costOk()) { toast('Для расчёта укажите материал и толщину всех деталей'); return; }
+    buildCost(); drawCost(); $('#costm').hidden = false;
+  }
+  // стоимость каждой детали: металл и рез по детали, доп. работы — пропорционально доле детали в группе
+  function costParts() {
     const S = summary();
-    if (!S.groups.length || S.groups.some(x => !(x.g.t > 0) || !isFinite(x.metalUsed))) { toast('Для расчёта укажите материал и толщину всех деталей'); return; }
-    const prices = SheetPrice.load();
-    costRows = S.groups.map(x => ({ label: groupLabel(x.g.mat, x.g.t), mass: x.metalUsed, length: x.total, metalRate: SheetPrice.metalRate(prices, x.g.mat, x.g.t), cutRate: SheetPrice.cutRate(prices, x.g.mat, x.g.t) }));
-    costExtras = [{ name: '', amount: '' }]; drawCost(); $('#costm').hidden = false;
+    const calc = SheetPrice.calculate(costState.rows);
+    const out = { groups: [], total: 0 };
+    calc.items.forEach((row, i) => {
+      const x = S.groups[costState.rows[i].gi];
+      const cnt = new Map();
+      for (const s of x.g.r.sheets) for (const it of s.items) cnt.set(it.id, (cnt.get(it.id) || 0) + s.count);
+      const rows = [...cnt].map(([id, qty]) => {
+        const p = x.byPid.get(id);
+        const rate = v => { const n = num(v); return isFinite(n) && n >= 0 ? n : 0; };
+        const metal1 = isFinite(p.mass) ? p.mass * rate(row.metalRate) : 0;
+        const cut1 = (p.cut || 0) / 1000 * rate(row.cutRate);
+        return { name: p.name, qty, metal: metal1 * qty, cut: cut1 * qty, w: (metal1 + cut1) * qty };
+      });
+      const extras = SheetPrice.share(rows.map(r => r.w), row.extra);
+      let gtot = 0;
+      const parts = rows.map((r, k) => {
+        const total = r.metal + r.cut + extras[k]; gtot += total;
+        return { name: r.name, qty: r.qty, metal: r.metal, cut: r.cut, extra: extras[k], unit: r.qty ? total / r.qty : 0, total };
+      }).sort((a, b) => b.total - a.total);
+      out.groups.push({ label: costState.rows[i].label, extra: row.extra, parts, gtot });
+      out.total += gtot;
+    });
+    return out;
+  }
+  function drawParts() {
+    const d = costParts();
+    $('#partBody').innerHTML = `<p class="note costnote">Металл и рез считаются по самой детали, а не по листу. Доп. работы разнесены по деталям пропорционально их доле в группе — большие детали берут больше.</p>` + d.groups.map(g => `<div class="costgroup"><h3>${esc(g.label)}${g.extra ? ` <span class="pext">доп. работы — ${money(g.extra)}</span>` : ''}</h3>
+      <table class="ptab ppart"><thead><tr><th>Деталь</th><th class="num">Кол-во</th><th class="num">Металл</th><th class="num">Рез</th><th class="num">Доп. работы</th><th class="num">Цена 1 шт</th><th class="num">Сумма</th></tr></thead><tbody>
+      ${g.parts.map(p => `<tr><td>${esc(p.name)}</td><td class="num">${p.qty.toLocaleString('ru-RU')}</td><td class="num">${money(p.metal)}</td><td class="num">${money(p.cut)}</td><td class="num">${money(p.extra)}</td><td class="num acc">${money(p.unit)}</td><td class="num">${money(p.total)}</td></tr>`).join('')}
+      </tbody></table></div>`).join('');
+    $('#partTotal').textContent = money(d.total);
   }
   $('#sCost').onclick = openCost;
+  $('#costParts').onclick = () => { drawParts(); $('#partm').hidden = false; };
   $('#costClose').onclick = () => { $('#costm').hidden = true; };
   $('#costm').addEventListener('click', e => { if (e.target.id === 'costm') $('#costm').hidden = true; });
+  $('#partClose').onclick = () => { $('#partm').hidden = true; };
+  $('#partm').addEventListener('click', e => { if (e.target.id === 'partm') $('#partm').hidden = true; });
   $('#costBody').addEventListener('input', e => {
-    if (e.target.dataset.cost) { const [i, k] = e.target.dataset.cost.split(':'); costRows[i][k] = e.target.value; updateCost(); }
-    if (e.target.dataset.extraName !== undefined) costExtras[+e.target.dataset.extraName].name = e.target.value;
-    if (e.target.dataset.extraAmount !== undefined) { costExtras[+e.target.dataset.extraAmount].amount = e.target.value; updateCost(); }
+    if (e.target.dataset.cost) { const [i, k] = e.target.dataset.cost.split(':'); costState.rows[i][k] = e.target.value; updateCost(); }
+    if (e.target.dataset.extraName !== undefined) { const [i, k] = e.target.dataset.extraName.split(':'); costState.rows[i].extras[k].name = e.target.value; }
+    if (e.target.dataset.extraAmount !== undefined) { const [i, k] = e.target.dataset.extraAmount.split(':'); costState.rows[i].extras[k].amount = e.target.value; updateCost(); }
   });
   $('#costBody').addEventListener('change', e => {
     if (!e.target.dataset.cost && e.target.dataset.extraAmount === undefined) return;
     if (e.target.value.trim() !== '' && (!(num(e.target.value) >= 0) || !isFinite(num(e.target.value)))) { toast('Введите число не меньше 0'); drawCost(); }
   });
-  $('#costBody').addEventListener('click', e => { const b = e.target.closest('[data-extra-del]'); if (b) { costExtras.splice(+b.dataset.extraDel, 1); drawCost(); } });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#costm').hidden) $('#costm').hidden = true; });
+  $('#costBody').addEventListener('click', e => {
+    const add = e.target.closest('[data-extra-add]'); if (add) { costState.rows[+add.dataset.extraAdd].extras.push({ name: '', amount: '' }); drawCost(); return; }
+    const del = e.target.closest('[data-extra-del]'); if (del) { const [i, k] = del.dataset.extraDel.split(':'); costState.rows[i].extras.splice(+k, 1); drawCost(); }
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    if (!$('#partm').hidden) $('#partm').hidden = true;
+    else if (!$('#costm').hidden) $('#costm').hidden = true;
+  });
 
   // ---------------------------------------------------------------- запуск
   function init(startFiles) {

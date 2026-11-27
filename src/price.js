@@ -32,16 +32,25 @@
   }
   const metalRate = (prices, mat, t) => num(t) <= 3 ? prices[mat].metalLow : prices[mat].metalHigh;
   const cutRate = (prices, mat, t) => nonNeg(prices[mat] && prices[mat].cut && prices[mat].cut[t], 0);
-  function calculate(rows, extras) {
+  function calculate(rows) {
     const items = (rows || []).map(r => {
       const metal = num(r.mass) * num(r.metalRate), cut = num(r.length) * num(r.cutRate);
-      return Object.assign({}, r, { metal, cut, total: metal + cut });
+      const works = (r.extras || []).map(x => ({ name: String(x.name || ''), amount: num(x.amount) }));
+      const extra = works.reduce((s, x) => s + x.amount, 0);
+      return Object.assign({}, r, { works, metal, cut, extra, total: metal + cut + extra });
     });
-    const works = (extras || []).map(x => ({ name: String(x.name || ''), amount: num(x.amount) }));
-    const metal = items.reduce((s, x) => s + x.metal, 0), cut = items.reduce((s, x) => s + x.cut, 0), extra = works.reduce((s, x) => s + x.amount, 0);
-    return { items, works, metal, cut, extra, total: metal + cut + extra };
+    const metal = items.reduce((s, x) => s + x.metal, 0), cut = items.reduce((s, x) => s + x.cut, 0), extra = items.reduce((s, x) => s + x.extra, 0);
+    return { items, metal, cut, extra, total: metal + cut + extra };
   }
-  const api = { KEY, MATS, THICK, defaults, normalize, load, save, metalRate, cutRate, calculate };
+  // доля суммы sum по весам: вес 0 у всех — поровну
+  function share(weights, sum) {
+    const w = (weights || []).map(x => num(x));
+    const tot = w.reduce((s, x) => s + x, 0), s = num(sum);
+    if (!w.length) return [];
+    if (!(tot > 0)) return w.map(() => s / w.length);
+    return w.map(x => s * x / tot);
+  }
+  const api = { KEY, MATS, THICK, defaults, normalize, load, save, metalRate, cutRate, calculate, share };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.SheetPrice = api;
 })(typeof window !== 'undefined' ? window : globalThis);
